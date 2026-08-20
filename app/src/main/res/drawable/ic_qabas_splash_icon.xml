@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  أيقونة سبلاش نظامي مبسّطة (Vector).
+  إن وُجد qabas_logo كـ PNG/WebP أوضح، استبدله في الثيم بـ @drawable/qabas_logo
+  واترك هذا الملف أو احذفه.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- دائرة توهج خفيفة -->
+    <path
+        android:fillColor="#1AE8C547"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+    <!-- شعلة مبسّطة -->
+    <path
+        android:fillColor="#E8C547"
+        android:pathData="M54,22 C48,34 42,40 42,52 C42,62 47,70 54,70 C61,70 66,62 66,52 C66,40 60,34 54,22 Z" />
+    <path
+        android:fillColor="#F5D76E"
+        android:pathData="M54,34 C51,40 48,44 48,52 C48,58 50,62 54,62 C58,62 60,58 60,52 C60,44 57,40 54,34 Z" />
+    <!-- قاعدة كتاب مبسّطة -->
+    <path
+        android:fillColor="#D4AF37"
+        android:pathData="M30,72 L54,66 L78,72 L78,82 L54,76 L30,82 Z" />
+    <path
+        android:fillColor="#B8960F"
+        android:pathData="M54,66 L54,76 L30,82 L30,72 Z" />
+</vector>

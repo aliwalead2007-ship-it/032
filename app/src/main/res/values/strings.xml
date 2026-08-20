@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">قبس</string>
+    <string name="google_app_id" translatable="false">1:391431563297:android:3e5a7b9c1d2e3f4a5b6c7d</string>
+    <string name="gcm_defaultSenderId" translatable="false">391431563297</string>
+    <string name="project_id" translatable="false">qabas-ai-studio</string>
+    <string name="default_web_client_id" translatable="false">391431563297-client.apps.googleusercontent.com</string>
+</resources>

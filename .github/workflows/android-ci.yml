@@ -1,0 +1,86 @@
+# قبس — CI مع إصلاح gradle-wrapper.jar تلقائياً
+name: Build & Sign APK
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # إصلاح jar التالف (غالباً من رفع الهاتف) — يحمّل الرسمي قبل أي بناء
+      - name: Fix gradle-wrapper.jar
+        run: |
+          mkdir -p gradle/wrapper
+          curl -sL -o gradle/wrapper/gradle-wrapper.jar \
+            "https://raw.githubusercontent.com/gradle/gradle/v9.0.0/gradle/wrapper/gradle-wrapper.jar"
+          # تحقق أنه ZIP/JAR صالح
+          python3 -c "import zipfile; zipfile.ZipFile('gradle/wrapper/gradle-wrapper.jar').namelist(); print('wrapper jar OK')"
+          chmod +x gradlew
+
+      - name: Inject secrets (optional)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            mkdir -p app
+            echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
+            echo "google-services.json written"
+          else
+            echo "No GOOGLE_SERVICES_JSON secret — skipping"
+          fi
+
+      - name: Compile Kotlin (fast fail)
+        run: |
+          ./gradlew :app:compileDebugKotlin \
+            --stacktrace \
+            --no-daemon \
+            --max-workers=2
+
+      - name: Assemble Debug APK
+        run: |
+          ./gradlew assembleDebug \
+            --stacktrace \
+            --no-daemon \
+            --max-workers=2
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qabas-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: On failure — print Kotlin errors hint
+        if: failure()
+        run: |
+          echo "================================================"
+          echo "ابحث في اللوج عن: e: file://  أو Unresolved reference"
+          echo "================================================"

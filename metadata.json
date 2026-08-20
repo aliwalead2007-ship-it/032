@@ -1,0 +1,8 @@
+{
+  "name": "Remix 030",
+  "description": "Imported from GitHub: Ali-awwww/030",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
