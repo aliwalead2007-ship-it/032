@@ -174,8 +174,9 @@ object VideoProcessor {
     }
 
     suspend fun mergeAmbientAudio(context: Context, videoPath: String, ambientAudioPath: String, outputPath: String): Boolean {
-        val command = "-y -i \"$videoPath\" -i \"$ambientAudioPath\" -filter_complex \"[1:a]volume=0.25[a1];[0:a][a1]amix=inputs=2:duration=first:dropout_transition=2[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac -b:a ${currentQualityPreset.audioBitrate} \"$outputPath\""
-        val success = executeCommand(command, "خلط الصوت المحيطي والأثر الهادئ")
+        // ثورة قبس (Audio Ducking): خفض صوت الخلفية تلقائياً عند حديث المعلق الصوتي
+        val command = "-y -i \"$videoPath\" -i \"$ambientAudioPath\" -filter_complex \"[1:a]volume=0.4[bg];[bg][0:a]sidechaincompress=threshold=0.05:ratio=4:attack=5:release=500[ducked_bg];[0:a][ducked_bg]amix=inputs=2:duration=first:dropout_transition=2[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac -b:a ${currentQualityPreset.audioBitrate} \"$outputPath\""
+        val success = executeCommand(command, "خلط الصوت المحيطي مع Audio Ducking")
         if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
 
         Log.w(TAG, "mergeAmbientAudio failed — keeping video without ambient mix")
@@ -231,17 +232,11 @@ object VideoProcessor {
                 styleAnalysis.movementPatterns
             ).lowercase(Locale.ROOT)
 
-        val isWordByWord = animBlob.contains("wordbyword") ||
-            animBlob.contains("word_by_word") ||
-            animBlob.contains("anim=wordbyword") ||
-            animBlob.contains("anim:wordbyword") ||
-            animBlob.contains("كلمة") ||
-            animBlob.contains("كلمة بكلمة") ||
-            animBlob.contains("تزامن") ||
-            animBlob.contains("kinetic")
+        // ثورة قبس (Kinetic Typography): تفعيل دائماً للكابشن الحركي (كلمة بكلمة)
+        val isWordByWord = true
 
         if (isWordByWord) {
-            val ok = addWordByWordOverlay(context, videoPath, text, styleAnalysis, outputPath)
+            val ok = addWordByWordOverlay(context, videoPath, text, styleAnalysis ?: VideoStyleAnalysis(), outputPath)
             if (ok) return true
             // سقوط آمن إلى كابشن ثابت
         }
@@ -879,18 +874,26 @@ object VideoProcessor {
         templateName: String,
         outputPath: String
     ): Boolean {
+        val lower = templateName.lowercase()
         val eqFilter = when {
-            // فلاتر الاستوديو المتقدم (AdvancedEditScreen)
-            templateName.contains("سينمائي") || templateName.contains("Teal") || templateName.contains("سينمائية") ->
+            // ثورة قبس (Mood Color Grading) - Dynamic mappings from Gemini
+            lower.contains("warm") || lower.contains("golden") || lower.contains("hope") || lower.contains("mercy") ->
+                "eq=contrast=1.15:brightness=0.03:saturation=1.25,colorchannelmixer=1.1:0:0:0:0:0.95:0:0:0:0:0.8:0" // Warm, golden, hopeful
+            lower.contains("cool") || lower.contains("teal") || lower.contains("sad") || lower.contains("trial") || lower.contains("dark") ->
+                "eq=contrast=1.2:brightness=-0.04:saturation=0.85,colorchannelmixer=0.8:0:0:0:0:1.0:0:0:0:0:1.15:0" // Cool, moody, dramatic
+            lower.contains("nature") || lower.contains("green") || lower.contains("peace") || lower.contains("serene") ->
+                "eq=contrast=1.1:brightness=0.01:saturation=1.3,colorchannelmixer=0.9:0:0:0:0:1.15:0:0:0:0:0.95:0" // Vibrant greens, peaceful
+            lower.contains("dramatic") || lower.contains("epic") || lower.contains("high contrast") ->
+                "eq=contrast=1.35:brightness=-0.02:saturation=1.1" // High contrast, epic
+            // فلاتر الاستوديو المتقدم القديمة كاحتياط
+            lower.contains("سينمائي") || lower.contains("سينمائية") ->
                 "eq=contrast=1.2:brightness=-0.02:saturation=1.15,colorchannelmixer=0.95:0:0:0:0:1.05:0:0:0:0:1.1:0"
-            templateName.contains("روحاني") || templateName.contains("Emerald") || templateName.contains("قرآني") ->
+            lower.contains("روحاني") || lower.contains("قرآني") ->
                 "eq=contrast=1.1:brightness=0.01:saturation=1.2,colorchannelmixer=0.9:0:0:0:0:1.15:0:0:0:0:0.95:0"
-            templateName.contains("عتيق") || templateName.contains("Sepia") || templateName.contains("تراثية") ->
+            lower.contains("عتيق") || lower.contains("تراثية") || lower.contains("sepia") ->
                 "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131"
-            templateName.contains("ساطع") || templateName.contains("Reels") || templateName.contains("حماسي") ->
+            lower.contains("ساطع") || lower.contains("حماسي") || lower.contains("reels") ->
                 "eq=contrast=1.3:brightness=0.03:saturation=1.35"
-            templateName.contains("طبيعي") || templateName.contains("Natural") ->
-                "eq=contrast=1.05:saturation=1.05"
             else -> "eq=contrast=1.08:saturation=1.1"
         }
 

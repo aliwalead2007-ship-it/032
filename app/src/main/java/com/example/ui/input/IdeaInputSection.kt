@@ -68,6 +68,25 @@ fun IdeaInputSection(
     var isEnhancingIdea by remember { mutableStateOf(false) }
     var showGuardDialog by remember { mutableStateOf(false) }
     var guardInspectionResult by remember { mutableStateOf<ContentInspectionResult?>(null) }
+    
+    // Premium Animations
+    val infiniteTransition = rememberInfiniteTransition()
+    val glowPulse by infiniteTransition.animateFloat(
+        initialValue = 0.5f,
+        targetValue = 1.0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+    val buttonScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.03f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(
@@ -254,7 +273,12 @@ fun IdeaInputSection(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4F46E5)),
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                        .shadow(
+                            if (state.inputText.isNotBlank() && !isEnhancingIdea) 8.dp * glowPulse else 0.dp,
+                            RoundedCornerShape(12.dp),
+                            spotColor = Color(0xFF8B5CF6)
+                        ),
                     enabled = !isEnhancingIdea
                 ) {
                     if (isEnhancingIdea) {
@@ -581,8 +605,9 @@ fun IdeaInputSection(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(58.dp)
+                    .scale(if (state.inputText.isNotBlank()) buttonScale else 1f)
                     .shadow(
-                        if (state.inputText.isNotBlank()) 16.dp else 0.dp,
+                        if (state.inputText.isNotBlank()) 16.dp * glowPulse else 0.dp,
                         RoundedCornerShape(16.dp),
                         spotColor = GoldPrimary
                     ),
@@ -595,7 +620,7 @@ fun IdeaInputSection(
                         .fillMaxSize()
                         .background(
                             if (state.inputText.isNotBlank()) {
-                                goldGradient
+                                Brush.horizontalGradient(colors = listOf(GoldSecondary, GoldPrimary, GoldSecondary))
                             } else {
                                 androidx.compose.ui.graphics.SolidColor(Color(0xFF1E293B))
                             },

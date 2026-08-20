@@ -42,6 +42,7 @@ import java.util.UUID
 fun ResourcesScreen(
     mediaResources: List<MediaResource>,
     onAddResource: (MediaResource) -> Unit,
+    onUpdateResource: (MediaResource) -> Unit,
     onRemoveResource: (String) -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit,
@@ -334,6 +335,40 @@ fun ResourcesScreen(
                                             if (resource.isBRoll) "B-Roll" else null
                                         ).joinToString(" • ")
                                         Text(meta, color = TextSecondary, fontSize = 11.sp)
+                                        
+                                        var expanded by remember { mutableStateOf(false) }
+                                        Box(modifier = Modifier.padding(top = 4.dp)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(Color(0xFF1E293B))
+                                                    .clickable { expanded = true }
+                                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                            ) {
+                                                Text(
+                                                    text = resource.category?.let { "🏷️ $it" } ?: "🏷️ إضافة تصنيف",
+                                                    color = if (resource.category != null) GoldPrimary else TextSecondary,
+                                                    fontSize = 10.sp,
+                                                    fontFamily = NotoSansFont
+                                                )
+                                            }
+                                            DropdownMenu(
+                                                expanded = expanded,
+                                                onDismissRequest = { expanded = false },
+                                                containerColor = Color(0xFF151B2B)
+                                            ) {
+                                                listOf("درامي", "خاشع", "حماسي", "هادئ", "طبيعة", "أشخاص", "عام").forEach { tag ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(tag, color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp) },
+                                                        onClick = {
+                                                            expanded = false
+                                                            onUpdateResource(resource.copy(category = tag))
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                                 IconButton(onClick = { onRemoveResource(resource.id) }) {

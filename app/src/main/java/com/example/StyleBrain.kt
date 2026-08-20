@@ -1836,22 +1836,68 @@ object StyleBrain {
                 return score
             }
 
-            // محاولة ترشيح إضافية بالذكاء الاصطناعي مع fallback للخوارزمية
+            // محاولة ترشيح إضافية بالذكاء الاصطناعي للجيل الثاني (العقل الاستباقي: دمج هجين تلقائي)
             val bestAlgorithmic = styles.maxByOrNull { calculateMatchScore(it) } ?: styles.first()
-
+            
             val aiMatched = try {
-                val prompt = """
-                    لدي فكرة لفيديو إسلامي: "$idea".
-                    المدة: $duration ثانية. النبرة: $tone. الجمهور: $audience.
+                if (styles.size >= 2 && CloudServices.isFirebaseInitialized) { // استخدام الهجين فقط إذا توفرت الإمكانيات
+                    val prompt = """
+                        أنت "العقل الاستباقي" (Proactive Brain) لاستوديو قبس.
+                        لدي فكرة لفيديو إسلامي: "$idea".
+                        المدة: $duration ثانية. النبرة: $tone. الجمهور: $audience.
+                        
+                        الأساليب المتاحة:
+                        ${styles.joinToString("\n") { "ID: ${it.id} | Name: ${it.name} | Traits: ${it.visualTraits.take(2).joinToString()}" }}
+                        
+                        أريدك أن تبدع. لا تختار أسلوباً واحداً فقط. اختر أفضل أسلوبين يمكن دمجهما (Hybrid) لإنتاج أفضل إخراج لهذه الفكرة المحددة.
+                        يجب أن ترجع ردك بصيغة JSON حصراً بهذا الشكل:
+                        {"primary_id": "ID_1", "secondary_id": "ID_2", "blend_ratio": 0.6, "hybrid_name": "اسم إبداعي للنمط الجديد"}
+                    """.trimIndent()
+                    val res = AppServices.chatWithAssistant(listOf(Pair(false, prompt)), null) ?: ""
                     
-                    الأساليب المتاحة:
-                    ${styles.joinToString("\n") { "ID: ${it.id} | Name: ${it.name} | Traits: ${it.visualTraits.take(2).joinToString()} | Score: ${it.overallScore}" }}
+                    val primaryId = Regex(""""primary_id"\s*:\s*"([^"]+)"""").find(res)?.groupValues?.get(1)
+                    val secondaryId = Regex(""""secondary_id"\s*:\s*"([^"]+)"""").find(res)?.groupValues?.get(1)
+                    val blendStr = Regex(""""blend_ratio"\s*:\s*([0-9.]+)""").find(res)?.groupValues?.get(1)
+                    val hybridName = Regex(""""hybrid_name"\s*:\s*"([^"]+)"""").find(res)?.groupValues?.get(1)
                     
-                    اختر الأسلوب الأنسب تماماً لهذه الفكرة. أرجع ID الأسلوب المختار فقط.
-                """.trimIndent()
-                val res = AppServices.chatWithAssistant(listOf(Pair(false, prompt))) ?: ""
-                styles.find { res.contains(it.id) }
-            } catch (_: Exception) {
+                    val pStyle = styles.find { it.id == primaryId }
+                    val sStyle = styles.find { it.id == secondaryId }
+                    
+                    if (pStyle != null && sStyle != null && pStyle.id != sStyle.id) {
+                        val ratio = blendStr?.toFloatOrNull() ?: 0.5f
+                        val name = hybridName ?: "دمج استباقي: ${pStyle.name.take(5)}+${sStyle.name.take(5)}"
+                        
+                        // إنتاج النمط الهجين لحظياً (العقل الاستباقي النشط)
+                        val clampedRatio = ratio.coerceIn(0.2f, 0.8f)
+                        val primaryWeight = 1.0f - clampedRatio
+                        val secondaryWeight = clampedRatio
+                        
+                        AbsorbedStyle(
+                            id = "proactive_hybrid_${System.currentTimeMillis()}",
+                            name = "✨ $name",
+                            sourceVideoPathOrUrl = "proactive_hybrid",
+                            analysis = "توليد استباقي لحظي: دمج (${(primaryWeight*100).toInt()}%) من ${pStyle.name} و (${(secondaryWeight*100).toInt()}%) من ${sStyle.name} ليناسب فكرة: $idea",
+                            visualTraits = (pStyle.visualTraits.take(3) + sStyle.visualTraits.take(2)).distinct(),
+                            motionTraits = (pStyle.motionTraits.take(3) + sStyle.motionTraits.take(2)).distinct(),
+                            textTraits = (pStyle.textTraits.take(3) + sStyle.textTraits.take(2)).distinct(),
+                            overallScore = ((pStyle.overallScore * primaryWeight) + (sStyle.overallScore * secondaryWeight)).toInt().coerceIn(80, 99)
+                        )
+                    } else {
+                        // تراجع عن الدمج إذا لم يجد أسلوبين صالحين، واختر الأول
+                        val fallbackId = primaryId ?: secondaryId
+                        styles.find { it.id == fallbackId }
+                    }
+                } else {
+                    val prompt = """
+                        لدي فكرة لفيديو إسلامي: "$idea".
+                        الأساليب المتاحة:
+                        ${styles.joinToString("\n") { "ID: ${it.id} | Name: ${it.name}" }}
+                        اختر الأسلوب الأنسب تماماً لهذه الفكرة. أرجع ID الأسلوب المختار فقط.
+                    """.trimIndent()
+                    val res = AppServices.chatWithAssistant(listOf(Pair(false, prompt))) ?: ""
+                    styles.find { res.contains(it.id) }
+                }
+            } catch (e: Exception) {
                 null
             }
 

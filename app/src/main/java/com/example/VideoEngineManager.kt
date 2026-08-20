@@ -262,13 +262,11 @@ class VideoEngineManager(private val context: Context) {
                         videoWithAudioPath
                     }
 
-                    // تطبيق فلتر الألوان من الاستوديو المتقدم (visualEffect) إن كان اسماً معروفاً وليس رابطاً
-                    val studioFilterNames = listOf("سينمائي", "روحاني", "عتيق", "ساطع", "طبيعي")
+                    // تطبيق فلتر الألوان (Mood Color Grading)
                     val sceneFilter = scene.visualEffect.trim()
                     if (sceneFilter.isNotBlank() &&
                         !sceneFilter.startsWith("http") &&
-                        !File(sceneFilter).exists() &&
-                        studioFilterNames.any { sceneFilter.contains(it, ignoreCase = true) }
+                        !File(sceneFilter).exists()
                     ) {
                         val gradedPath = File(cacheDir, "filter_vid_$index.mp4").absolutePath
                         val gradeOk = try {

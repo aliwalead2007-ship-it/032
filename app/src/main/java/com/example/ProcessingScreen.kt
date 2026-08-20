@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.activity.compose.BackHandler
@@ -699,6 +700,8 @@ private fun ProcessingScreenUI(
 
             Spacer(modifier = Modifier.height(24.dp))
             if (isFailed) {
+                AutomatedErrorFeedback(statusText = statusText, activityLog = activityLog)
+                Spacer(modifier = Modifier.height(16.dp))
                 OutlinedButton(
                     onClick = onConfirmCancel,
                     modifier = Modifier.fillMaxWidth(0.85f).height(56.dp),
@@ -937,5 +940,66 @@ private fun CancelProcessingButton(onCancel: () -> Unit) {
     ) {
         Icon(Icons.Default.Close, Translator.tr("إلغاء المعالجة"), modifier = Modifier.padding(end = 8.dp))
         Text(Translator.tr("إلغاء المعالجة"), fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
+@Composable
+fun AutomatedErrorFeedback(statusText: String, activityLog: List<String>) {
+    val errorAnalysis = remember(statusText, activityLog) {
+        val log = activityLog.joinToString(" ").lowercase()
+        val status = statusText.lowercase()
+        
+        when {
+            log.contains("api") || log.contains("مفتاح") || log.contains("gemini") || status.contains("gemini") ->
+                Translator.tr("تعذر التواصل مع الذكاء الاصطناعي (Gemini). يرجى التأكد من اتصالك بالإنترنت أو مراجعة مفتاح API في الإعدادات.")
+            log.contains("ffmpeg") || log.contains("assemble") || log.contains("تجميع") || log.contains("تصدير") ->
+                Translator.tr("حدث خطأ أثناء دمج الفيديو (FFmpeg). قد يكون بسبب نقص مساحة التخزين، أو تعطل أثناء معالجة لقطات B-Roll. حاول مجدداً بنص أقصر أو جودة أقل.")
+            log.contains("b-roll") || log.contains("pexels") || log.contains("pixabay") ->
+                Translator.tr("تعذر جلب اللقطات السينمائية من المصدر. تأكد من اتصالك بالإنترنت القوي، أو تأكد من تفعيل المفاتيح.")
+            log.contains("صوت") || log.contains("tts") ->
+                Translator.tr("حدث خطأ أثناء توليد التعليق الصوتي. يرجى التأكد من توفر خدمة الإنترنت.")
+            else -> Translator.tr("يبدو أن هناك عائقاً تقنياً منع إكمال الفيديو. يرجى التحقق من اتصال الإنترنت وإعادة المحاولة.")
+        }
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF2A080C)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color(0xFFEF4444).copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = "Error",
+                    tint = Color(0xFFEF4444),
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = Translator.tr("تحليل تلقائي لسبب الفشل"),
+                    color = Color.White,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = CairoFont
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = errorAnalysis,
+                color = Color.White.copy(alpha = 0.85f),
+                fontSize = 13.sp,
+                fontFamily = CairoFont,
+                lineHeight = 20.sp
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "الخطأ البرمجي: $statusText",
+                color = Color(0xFFEF4444).copy(alpha = 0.75f),
+                fontSize = 11.sp,
+                fontFamily = CairoFont,
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(6.dp)).padding(8.dp).fillMaxWidth()
+            )
+        }
     }
 }

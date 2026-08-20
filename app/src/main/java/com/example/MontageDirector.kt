@@ -160,16 +160,52 @@ object MontageDirector {
         preferredStyleId: String? = null
     ): List<Scene> {
         val plan = createPlan(idea, tone, targetDurationSec, audience, styleDescription, preferredStyleId)
+        val directive = plan.directive
+        val ofMotion = normalizeMotion(directive?.motionType ?: "slow_zoom")
+        val filter = directive?.filterHint ?: "warm_gold"
+
+        val geminiScenes = try {
+            AppServices.generateScript(
+                idea = idea,
+                styleDescription = plan.styleBrief,
+                contentType = "Reels/Shorts",
+                contentTone = tone
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Gemini failed in directToScenes, fallback to hardcoded", e)
+            emptyList()
+        }
+
+        if (geminiScenes.isNotEmpty() && geminiScenes.size >= 2) {
+            // Enhance Gemini scenes with our directed style (optical flow, filter, etc.)
+            return geminiScenes.map { scene ->
+                val enhancedQuery = buildString {
+                    append(scene.description)
+                    if (!directive?.visualKeywordsEn.isNullOrEmpty()) append(" ${directive?.visualKeywordsEn?.joinToString(" ")}")
+                    append(" | motion=$ofMotion")
+                    append(" | filter=$filter")
+                    append(" | caption=${directive?.captionAnimation ?: "FadeIn"}")
+                }
+                scene.copy(
+                    description = enhancedQuery,
+                    transitionType = if (scene.transitionType.isBlank() || scene.transitionType == "Fade") plan.scenes.firstOrNull()?.transition ?: "Dissolve" else scene.transitionType,
+                    tempo = if (scene.tempo.isBlank() || scene.tempo == "متوسط") plan.scenes.firstOrNull()?.tempo ?: "متوسط" else scene.tempo,
+                    visualEffect = if (scene.visualEffect.isBlank()) filter else scene.visualEffect
+                )
+            }
+        }
+
+        // Fallback to hardcoded plan if Gemini fails
         val scenes = toScenes(plan)
         if (scenes.isEmpty()) {
             return listOf(
                 Scene(
                     title = idea.take(40).ifBlank { "قبس" },
-                    description = "mosque peaceful prayer soft light cinematic | motion=slow_zoom",
+                    description = "mosque peaceful prayer soft light cinematic | motion=$ofMotion | filter=$filter",
                     durationInSeconds = 5,
                     transitionType = "Dissolve",
                     tempo = "خاشع",
-                    visualEffect = "slow_zoom"
+                    visualEffect = filter
                 )
             )
         }

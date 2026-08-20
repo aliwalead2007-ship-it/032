@@ -628,6 +628,11 @@ fun AppNavigation(
                 onAddResource = { resource ->
                     viewModel.updateState { copy(mediaResources = mediaResources + resource) }
                 },
+                onUpdateResource = { updatedResource ->
+                    viewModel.updateState { 
+                        copy(mediaResources = mediaResources.map { if (it.id == updatedResource.id) updatedResource else it })
+                    }
+                },
                 onRemoveResource = { resId ->
                     viewModel.updateState { copy(mediaResources = mediaResources.filter { it.id != resId }) }
                 },
