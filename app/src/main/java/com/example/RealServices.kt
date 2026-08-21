@@ -49,7 +49,7 @@ object RealGeminiService {
                 هام جداً في المشاهد (Visual Metaphors & Pacing): لا تستخدم ترجمة حرفية للمشاهد (مثلاً دعاء = شخص يدعو). استخدم استعارات بصرية طبيعية (رمال الصحراء، قطرة ماء، غيوم، نور). 
                 اجعل مدد المشاهد (durationHintSeconds) متغيرة: 2-3 ثوانٍ للمقدمة السريعة والخطاف، 5-7 ثوانٍ للتأمل والرسائل العميقة.
                 إن كان النص قصيراً فقلل عدد المشاهد. لا تستخدم قوالب جاهزة.
-                \$tasteContext
+                $tasteContext
                 
                 يجب أن تكون النتيجة بتنسيق JSON حصراً:
                 {
@@ -67,7 +67,7 @@ object RealGeminiService {
                 put(JSONObject().apply {
                     put("role", "user")
                     put("parts", JSONArray().apply {
-                        put(JSONObject().apply { put("text", "\$systemPrompt\n\n--- الفكرة ---\n\$idea\n--- نهاية ---") })
+                        put(JSONObject().apply { put("text", "$systemPrompt\n\n--- الفكرة ---\n$idea\n--- نهاية ---") })
                     })
                 })
             }
@@ -82,7 +82,7 @@ object RealGeminiService {
             
             val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
                 .post(requestBody)
                 .build()
                 
@@ -415,7 +415,7 @@ object RealGeminiService {
             generatedScenes.add("المشهد 3: ${parts[2]}")
         } else {
             val shortText = cleanIdea.take(30) + if (cleanIdea.length > 30) "..." else ""
-            generatedScenes.add("المشهد 1: مقدمة حول (\$shortText)")
+            generatedScenes.add("المشهد 1: مقدمة حول ($shortText)")
             generatedScenes.add("المشهد 2: عرض الفكرة الأساسية")
             generatedScenes.add("المشهد 3: الخاتمة والدعوة للتفكر")
         }
@@ -830,7 +830,7 @@ object RealMediaLibraryService {
             
             val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
                 .post(requestBody)
                 .build()
                 
