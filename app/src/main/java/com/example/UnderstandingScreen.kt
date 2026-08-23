@@ -56,6 +56,7 @@ fun UnderstandingScreen(
 
     var isAnalyzing by remember { mutableStateOf(true) }
     var analysisResult by remember { mutableStateOf<IdeaAnalysis?>(null) }
+    var analysisError by remember { mutableStateOf<String?>(null) }
     var selectedHook by remember { mutableStateOf<String?>(null) }
     var currentToneSelected by remember { mutableStateOf(contentTone.ifBlank { "خاشع وهادئ" }) }
     var currentVisualSelected by remember { 
@@ -71,40 +72,55 @@ fun UnderstandingScreen(
 
     LaunchedEffect(inputText, contentType, contentTone, videoDuration) {
         isAnalyzing = true
-        if (!ContentFilterService.filterText(inputText)) {
-            SystemLogsManager.addLog(
-                "WARN",
-                "تحذير فلتر المحتوى — المتابعة بالتحليل والإنتاج",
-                androidx.compose.ui.graphics.Color(0xFFE8C547)
-            )
-        }
-        hasViolation = false
-        val result = AppServices.analyzeIdea(inputText)
-        analysisResult = result
-        if (result.tone.isNotBlank() && result.tone != "خاشع وملهم") currentToneSelected = result.tone
-        
-        val chosenStyle = when {
-            styleDescription.isNotBlank() -> styleDescription
-            videoStyleAnalysis != null && videoStyleAnalysis.detectedStyle.isNotBlank() -> videoStyleAnalysis.detectedStyle
-            else -> {
-                val bestAbsorbed = StyleBrain.chooseBestStyleForIdea(inputText, videoDuration.filter { it.isDigit() }.toIntOrNull() ?: 30, currentToneSelected, "الجمهور العام")
-                if (bestAbsorbed != null) "StyleBrain (${bestAbsorbed.name})" else "محايد (أساسي)"
+        analysisError = null
+        try {
+            if (!ContentFilterService.filterText(inputText)) {
+                SystemLogsManager.addLog(
+                    "WARN",
+                    "تحذير فلتر المحتوى — المتابعة بالتحليل والإنتاج",
+                    androidx.compose.ui.graphics.Color(0xFFE8C547)
+                )
             }
-        }
-        currentVisualSelected = chosenStyle
-        if (result.hookSuggestions.isNotEmpty() && result.hookSuggestions.firstOrNull()?.contains("تعذّر التحليل") != true) {
-            selectedHook = result.hookSuggestions.firstOrNull()
-        }
-        
-        val fullStyleDesc = buildString {
-            append("الأسلوب: $chosenStyle")
-            append(" | النبرة: $currentToneSelected")
-            if (!selectedHook.isNullOrBlank()) {
-                append(", خطاف البداية: $selectedHook")
+            hasViolation = false
+            val result = AppServices.analyzeIdea(inputText)
+            
+            if (result == null) {
+                analysisError = "فشل التحليل: لم يتم الحصول على نتيجة من الخادم. تأكد من اتصال الإنترنت ومفتاح API."
+                analysisResult = null
+            } else {
+                analysisResult = result
+                analysisError = null
+                if (result.tone.isNotBlank() && result.tone != "خاشع وملهم") currentToneSelected = result.tone
+                
+                val chosenStyle = when {
+                    styleDescription.isNotBlank() -> styleDescription
+                    videoStyleAnalysis != null && videoStyleAnalysis.detectedStyle.isNotBlank() -> videoStyleAnalysis.detectedStyle
+                    else -> {
+                        val bestAbsorbed = StyleBrain.chooseBestStyleForIdea(inputText, videoDuration.filter { it.isDigit() }.toIntOrNull() ?: 30, currentToneSelected, "الجمهور العام")
+                        if (bestAbsorbed != null) "StyleBrain (${bestAbsorbed.name})" else "محايد (أساسي)"
+                    }
+                }
+                currentVisualSelected = chosenStyle
+                if (result.hookSuggestions.isNotEmpty() && result.hookSuggestions.firstOrNull()?.contains("تعذّر التحليل") != true) {
+                    selectedHook = result.hookSuggestions.firstOrNull()
+                }
+                
+                val fullStyleDesc = buildString {
+                    append("الأسلوب: $chosenStyle")
+                    append(" | النبرة: $currentToneSelected")
+                    if (!selectedHook.isNullOrBlank()) {
+                        append(", خطاف البداية: $selectedHook")
+                    }
+                }
+                onStyleDescriptionChange(fullStyleDesc)
             }
+        } catch (e: Exception) {
+            analysisError = "حدث خطأ غير متوقع: ${e.message ?: "فشل التحليل"}"
+            analysisResult = null
+            SystemLogsManager.addLog("ERROR", "خطأ في UnderstandingScreen: ${e.message}", Color(0xFFEF4444))
+        } finally {
+            isAnalyzing = false
         }
-        onStyleDescriptionChange(fullStyleDesc)
-        isAnalyzing = false
     }
 
     val updateCombinedStyle: (String, String, String?) -> Unit = { tone, visual, hook ->
@@ -142,6 +158,7 @@ fun UnderstandingScreen(
             UnderstandingBottomBar(
                 hasViolation = hasViolation,
                 isAnalyzing = isAnalyzing,
+                hasError = analysisError != null,
                 goldGradient = goldGradient,
                 onEditIdea = onEditIdea,
                 onProceed = {
@@ -156,16 +173,20 @@ fun UnderstandingScreen(
     ) { paddingValues ->
         Box(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
             AnimatedContent(
-                targetState = isAnalyzing,
+                targetState = Triple(isAnalyzing, analysisResult, analysisError),
                 transitionSpec = {
                     fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
                 },
                 label = "UnderstandingContent"
-            ) { analyzing ->
-                if (analyzing) {
-                    UnderstandingLoadingView()
-                } else {
-                    analysisResult?.let { analysis ->
+            ) { (analyzing, analysis, error) ->
+                when {
+                    analyzing -> {
+                        UnderstandingLoadingView()
+                    }
+                    error != null -> {
+                        UnderstandingErrorView(errorMessage = error, onRetry = onEditIdea)
+                    }
+                    analysis != null -> {
                         UnderstandingContentView(
                             inputText = inputText,
                             analysis = analysis,
@@ -177,7 +198,111 @@ fun UnderstandingScreen(
                             onSelectHook = { h -> updateCombinedStyle(currentToneSelected, currentVisualSelected, h) }
                         )
                     }
+                    else -> {
+                        UnderstandingErrorView(
+                            errorMessage = "فشل التحليل: لم يتم الحصول على نتيجة صحيحة",
+                            onRetry = onEditIdea
+                        )
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun UnderstandingErrorView(errorMessage: String, onRetry: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .background(Color(0xFFEF4444).copy(alpha = 0.15f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.ErrorOutline,
+                contentDescription = null,
+                tint = Color(0xFFEF4444),
+                modifier = Modifier.size(48.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = Translator.tr("حدث خطأ في التحليل"),
+            color = Color.White,
+            fontFamily = CairoFont,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = errorMessage,
+            color = TextSecondary,
+            fontFamily = NotoSansFont,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onRetry,
+            modifier = Modifier
+                .fillMaxWidth(0.8f)
+                .height(48.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.ArrowBack, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    Translator.tr("العودة والمحاولة مرة أخرى"),
+                    color = DeepSlate,
+                    fontFamily = CairoFont,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFF151B2B)),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF1E293B))
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    text = Translator.tr("💡 نصيحة:"),
+                    color = GoldPrimary,
+                    fontFamily = CairoFont,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = Translator.tr("تأكد من:\n• وجود اتصال إنترنت\n• صحة مفتاح Gemini API\n• عدم تجاوز حد المستخدم اليومي"),
+                    color = TextSecondary,
+                    fontFamily = NotoSansFont,
+                    fontSize = 11.sp,
+                    lineHeight = 16.sp
+                )
             }
         }
     }
@@ -187,6 +312,7 @@ fun UnderstandingScreen(
 fun UnderstandingBottomBar(
     hasViolation: Boolean,
     isAnalyzing: Boolean,
+    hasError: Boolean,
     goldGradient: Brush,
     onEditIdea: () -> Unit,
     onProceed: () -> Unit
@@ -214,7 +340,7 @@ fun UnderstandingBottomBar(
 
             Button(
                 onClick = onProceed,
-                enabled = !isAnalyzing && !hasViolation,
+                enabled = !isAnalyzing && !hasViolation && !hasError,
                 modifier = Modifier.weight(2f).height(56.dp).shadow(12.dp, RoundedCornerShape(16.dp), spotColor = GoldPrimary),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
                 contentPadding = PaddingValues(),
@@ -224,7 +350,7 @@ fun UnderstandingBottomBar(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            if (!isAnalyzing) goldGradient else androidx.compose.ui.graphics.SolidColor(Color(0xFF1E293B)),
+                            if (!isAnalyzing && !hasError) goldGradient else androidx.compose.ui.graphics.SolidColor(Color(0xFF1E293B)),
                             RoundedCornerShape(16.dp)
                         ),
                     contentAlignment = Alignment.Center
@@ -635,7 +761,7 @@ fun VisualSettingsSection(
                     }
 
                     Text(
-                        "يقوم عقل الأساليب تلقائياً بتطبيق سمات الأسلوب المستنسخ (ألوان داكنة مع ذهبي، حركة زووم بطيء، وخط كوفي مبرز) على كافة مشاهد السيناريو دون الحاجة لأي ضبط يدوي.",
+                        "يقوم عقل الأساليب تلقائياً بتطبيق سمات الأسلوب المستنسخ (ألوان داكنة مع ذهبي، حركة زووم بطيء...)",
                         color = TextSecondary,
                         fontFamily = NotoSansFont,
                         fontSize = 12.sp,
