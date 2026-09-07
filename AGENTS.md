@@ -113,7 +113,16 @@
 | CI | تشغيل كامل أخضر بعد إصلاحين (capture TTS + قيم `.env.example`). |
 | `ApiKeysScreen.kt` / `ApiKeyValidator.kt` | إكمال خيارات المفاتيح المجانية: إضافة بطاقتي **Azure Speech (TTS)** (مع حقل المنطقة Region) و**ElevenLabs (TTS)** — وكلاهما يُقرآن فعلياً في `generateVoiceover` وكانا غائبين عن الواجهة — مع فحص اتصال حقيقي لكل منهما في `validateKey`، وإدراج المفتاحين والمنطقة في تصدير/استيراد النسخ الاحتياطي JSON، وإضافة بطاقة افتتاحية «**يعمل مجاناً دون أي مفتاح 🎉**» توضح أن التحليل المحلي + محرك النطق المدمج + FFmpeg تعمل بلا مفاتيح وبدون إنترنت، وأن بقية المفاتيح اختيارية. |
 
-### و) دروس مستفادة (أخطاء حُلت في CI)
+### و) تحسينات UI (سبتمبر 2026)
+
+| ملف | ماذا أُنجز |
+|-----|------------|
+| `AppNavigation.kt` | انتقال أنيميشن بين الشاشات: لفّ `when (state.appState)` داخل `AnimatedContent` بانتقال `slide (1/4 عرض) + fade` 240ms (Compose BOM 2024.09.00 → stable، بلا OptIn) — نقلة سينمائية بدل التبديل الفاصل. |
+| `ApiKeyValidator.kt` / `ApiKeysScreen.kt` | تغطية تحقق مفتاحي Azure TTS وElevenLabs بـ `ApiUsageTracker.track(context, "Azure TTS"|"ElevenLabs")` — أصبحت قياساتهما الحقيقية تظهر في لوحة المطور (كانتا النقطتين الوحيدتين خارج العدّاد). إمضاء `validateKey` الجديد: `(context, serviceType, key, hint = null)`. |
+| `QabasStudioSharedComponents.kt` (جديد) | مكوّنا `QabasCard` (حدود ذهبية متدرّجة + توهج + `luxuryCardStyle`) و`QabasSectionHeader` (رأس قسم موحّد مع ترايل اختياري) — إعادة استخدام للمظهر الفاخر. |
+| `ProjectsScreen.kt` | اعتماد `QabasCard` لبطاقات المشاريع (يبقى `clickable` على البطاقة) — فض 13 سطراً من التكرار. |
+
+### ز) دروس مستفادة (أخطاء حُلت في CI)
 
 1. **`TextToSpeech` capture:** لا تَستدعِ `tts.method()` داخل لامدا `TextToSpeech(context){...}` عبر الثابت الخارجي — استخدم `var tts: TextToSpeech? = null` ثم `val instance = tts ?: return@TextToSpeech` (اللامدا تُنفَّذ أثناء الإنشاء قبل اكتمال التخصيص).
 2. **`.env.example`:** القيمة الفارغة (`KEY=""`) تُنتج `BuildConfig` معطوباً (`String KEY = ;`). أبقِ دائماً قيمة placeholder غير فارغة.
@@ -151,7 +160,7 @@
 
 ## 6. كيف تكمل «كأنك نفس المساعد»
 
-1. اقرأ `AGENTS.md` ثم قسم **55–56** في `README.md`.
+1. اقرأ `AGENTS.md` ثم قسم **64–66** في `README.md`.
 2. اسأل المستخدم (إن لزم): هل نجح التصدير على الجهاز؟ ماذا رأيت بالضبط؟
 3. نفّذ **خطوة واحدة** حسب القسم 4.
 4. عدّل الملفات الكاملة → سلّمها للتنزيل.
@@ -178,7 +187,8 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 
 > المسار محصَّن في الكود؛ آية الدخول والسبلاش جاهزان؛ لوحة المطور خالية من البيانات المزيفة (مستخدمون/إيرادات/استهلاك API/عدّ أسبوعي حقيقي).  
 > **الأولوية:** نتيجة اختبار التصدير على الجهاز → ثم إصلاح أو تقوية offline فقط.  
-> لوحة المطور: 12 نقطة HTTP ملفوفة بـ `ApiUsageTracker`، وتحميل فعلي من Firestore/Supabase/Room.  
+> لوحة المطور: 14 نقطة HTTP ملفوفة بـ `ApiUsageTracker` (انضمّت Azure TTS وElevenLabs من شاشة المفاتيح)، وتحميل فعلي من Firestore/Supabase/Room.  
 > **سبتمبر 2026:** Gemini ↑ 2.0-flash، دمج FFmpeg حقيقي، تعليق صوتي مجاني دائماً (TTS النظام)، توثيق مجانيّ في `.env.example`، CI أخضر.  
-> شاشة المفاتيح اكتملت لكل الطبقة المجانية (Azure + ElevenLabs وبطاقة «يعمل بلا مفاتيح») — صادقت عليها CI (تشغيل خضراء بعد الدفع).  
+> شاشة المفاتيح اكتملت لكل الطبقة المجانية (Azure + ElevenLabs وبطاقة «يعمل بلا مفاتيح»).  
+> **UI سبتمبر 2026:** انتقال أنيميشن بين الشاشات (`AnimatedContent` slide+fade)، مكوّنا `QabasCard`/`QabasSectionHeader` مع اعتمادها في المشاريع، وتغطية تحقق المفاتيح بالعداد — CI أخضر للدفعة (`7542c0e`).  
 > وثّق كل حركة في `AGENTS.md` + `README.md`.

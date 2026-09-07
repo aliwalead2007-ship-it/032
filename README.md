@@ -377,6 +377,11 @@
 - **توثيق الطبقات المجانية (`.env.example`):** إضافة روابط ومفاتيح كل خدمة (Gemini، Azure، ElevenLabs، Groq، Pexels، Pixabay، Supabase) مع شرح أن التطبيق يعمل بلا مفاتيح (محلل محلي + TTS مدمج). ملاحظة: يجب إبقاء قيم placeholder غير فارغة حتى لا ينكسر `BuildConfig.java`.
 - **CI أخضر:** تشغيل كامل ناجح (Compile Kotlin → Assemble Debug APK → Upload APK).
 
+### 66. انسيابية التنقل + تغطية تحقق المفاتيح + مكوّنات البطاقات الفاخرة (Screen Transitions · Key-Validation Tracking · QabasCard)
+- **انتقال أنيميشن بين الشاشات (`AppNavigation`):** لفّ `when (state.appState)` داخل `AnimatedContent` بانتقال `slide + fade` (240ms) — الخروج ينزلق يميناً مع تلاشٍ والدخول ينزلق من اليسار، بواقع ربع عرض الشاشة، لنقلة سينمائية فاخرة متناسقة مع هوية قبس (بلا أي `MaterialTheme` جديدة).
+- **تغطية تحقق المفاتيح بـ `ApiUsageTracker` (`ApiKeyValidator`):** استدعاءا التحقق الفعلي لـ Azure TTS (`sts/issuetoken`) وElevenLabs (`/v1/user/subscription`) أصبحا يُسجّلان الآن في عداد استهلاك/زمن الخدمات — فتظهر القياسات الحقيقية في لوحة المطور عند إجراء فحص اتصال من شاشة المفاتيح (كانا النقطة الوحيدة غير المغطاة).
+- **مكوّن `QabasCard` + `QabasSectionHeader` (`QabasStudioSharedComponents`):** بطاقة فاخرة معاد استخدامها (حدود ذهبية متدرّجة + توهج + تخصيص padding) ورأس قسم موحّد، مع اعتمادها في `ProjectsScreen` لبطاقات المشاريع (النقر محفوظ) — يُسهّل توحيد المظهر المستقبلي.
+
 ### 65. إكمال خيارات المفاتيح المجانية في شاشة المفاتيح (Free-Tier Keys UI · Azure · ElevenLabs · Zero-Key)
 - **بطاقتا Azure Speech و ElevenLabs:** إنشاء حقول في `ApiKeysScreen` لمفتاحَي TTS اللذين كانا يُقرآن فعلياً في `generateVoiceover` لكنهما غائبان عن الواجهة — مع حقل **المنطقة (Region)** لـ Azure، ودليل خطوة-بخطوة لكل مفتاح ورابط مباشر (Azure Speech Free F0 مجاناً للأبد، ElevenLabs Free مع حصة شهرية).
 - **فحص اتصال حقيقي في `ApiKeyValidator`:** تحقق فعلي من Azure (`sts/v1.0/issuetoken` عبر `Ocp-Apim-Subscription-Key` + المنطقة) وElevenLabs (`/v1/user/subscription` عبر `xi-api-key`) مع رسائل نجاح/خطأ موضحة بالعربية.
