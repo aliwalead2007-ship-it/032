@@ -47,6 +47,8 @@ googleid = "1.1.1"
 ffmpegKit = "6.0.3"
 billing = "7.0.0"
 opencv = "4.10.0"
+supabase = "3.8.0"
+kotlinxSerializationJson = "1.7.3"
 
 
 [libraries]
@@ -115,6 +117,14 @@ ffmpeg-kit-full = { group = "dev.ffmpegkit-maintained", name = "ffmpeg-kit-full"
 billing-ktx = { group = "com.android.billingclient", name = "billing-ktx", version.ref = "billing" }
 opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
 
+# Supabase (Backend-as-a-Service: Postgres + Auth + Storage + Realtime)
+supabase-bom = { group = "io.github.jan-tennert.supabase", name = "bom", version.ref = "supabase" }
+supabase-postgrest = { group = "io.github.jan-tennert.supabase", name = "postgrest-kt" }
+supabase-auth = { group = "io.github.jan-tennert.supabase", name = "auth-kt" }
+supabase-storage = { group = "io.github.jan-tennert.supabase", name = "storage-kt" }
+supabase-functions = { group = "io.github.jan-tennert.supabase", name = "functions-kt" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
@@ -123,3 +133,4 @@ google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "googleDev
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secretsGradlePlugin" }
 google-services = { id = "com.google.gms.google-services", version.ref = "googleServices" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

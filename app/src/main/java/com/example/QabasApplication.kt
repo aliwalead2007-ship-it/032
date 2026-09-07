@@ -12,7 +12,7 @@ class QabasApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
+
         // Initialize Firebase & Analytics with respect to user settings
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
@@ -20,7 +20,7 @@ class QabasApplication : Application() {
             }
             if (FirebaseApp.getApps(this).isNotEmpty()) {
                 firebaseAnalytics = FirebaseAnalytics.getInstance(this)
-                
+
                 // Respect user analytics preference from SharedPreferences
                 val prefs = getSharedPreferences("qabas_prefs", MODE_PRIVATE)
                 val isAnalyticsEnabled = prefs.getBoolean("analytics_enabled", true)
@@ -29,6 +29,26 @@ class QabasApplication : Application() {
             }
         } catch (t: Throwable) {
             Log.w("QabasApplication", "Firebase Analytics initialization deferred: ${t.message}")
+        }
+
+        // Initialize Supabase (Postgres + Auth + Storage + Edge Functions).
+        // Runs after Firebase so analytics user props propagate to both.
+        try {
+            if (SupabaseConfig.isConfigured) {
+                // Touch the client to trigger lazy initialization.
+                SupabaseConfig.client
+                Log.d(
+                    "QabasApplication",
+                    "Supabase configured for ${SupabaseConfig.url}"
+                )
+            } else {
+                Log.w(
+                    "QabasApplication",
+                    "Supabase not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in .env to enable cloud Postgres, Auth, Storage, and Edge Functions."
+                )
+            }
+        } catch (t: Throwable) {
+            Log.w("QabasApplication", "Supabase initialization deferred: ${t.message}")
         }
 
         // Initialize core application services
