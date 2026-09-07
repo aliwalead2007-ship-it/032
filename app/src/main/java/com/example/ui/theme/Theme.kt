@@ -41,12 +41,12 @@ object ThemeManager {
 }
 
 private val DarkColorScheme = darkColorScheme(
-    primary = AiCyan,
-    secondary = AiViolet,
-    tertiary = GoldPrimary,
+    primary = AiViolet,
+    secondary = AiCyan,
+    tertiary = AiVioletLight,
     background = DeepSlate,
     surface = CardSurface,
-    onPrimary = DeepSlate,
+    onPrimary = Color.White,
     onSecondary = DeepSlate,
     onTertiary = DeepSlate,
     onBackground = TextPrimary,
@@ -54,9 +54,9 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF0EA5E9),
-    secondary = Color(0xFF7C3AED),
-    tertiary = GoldSecondary,
+    primary = Color(0xFF7C3AED),
+    secondary = Color(0xFF0891B2),
+    tertiary = Color(0xFFA78BFA),
     background = LightBackground,
     surface = LightSurface,
     onPrimary = Color.White,
