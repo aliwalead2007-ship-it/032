@@ -47,7 +47,7 @@ googleid = "1.1.1"
 ffmpegKit = "6.0.3"
 billing = "7.0.0"
 opencv = "4.10.0"
-supabase = "3.8.0"
+supabase = "3.6.0"
 kotlinxSerializationJson = "1.7.3"
 
 
