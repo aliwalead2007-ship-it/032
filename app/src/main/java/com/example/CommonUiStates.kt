@@ -57,7 +57,7 @@ fun Modifier.bouncingClickable(
         .graphicsLayer(scaleX = scale, scaleY = scale)
         .clickable(
             interactionSource = interactionSource,
-            indication = ripple(color = GoldPrimary.copy(alpha = 0.25f)),
+            indication = ripple(color = AiCyan.copy(alpha = 0.25f)),
             enabled = enabled,
             onClick = onClick
         )
@@ -76,16 +76,16 @@ fun Modifier.luxuryCardStyle(
         .shadow(
             elevation = glowElevation,
             shape = shape,
-            ambientColor = GoldPrimary.copy(alpha = 0.08f),
-            spotColor = GoldPrimary.copy(alpha = 0.12f)
+            ambientColor = AiCyan.copy(alpha = 0.12f),
+            spotColor = AiViolet.copy(alpha = 0.18f)
         )
         .border(
             width = 1.dp,
             brush = Brush.linearGradient(
                 listOf(
-                    GoldPrimary.copy(alpha = borderAlpha),
-                    GoldSecondary.copy(alpha = borderAlpha * 0.5f),
-                    Color(0xFF1E293B).copy(alpha = 0.4f)
+                    AiCyan.copy(alpha = borderAlpha),
+                    AiViolet.copy(alpha = borderAlpha),
+                    AiGlowBlue.copy(alpha = borderAlpha * 0.6f)
                 )
             ),
             shape = shape
@@ -274,7 +274,7 @@ fun QabasEmptyState(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, GoldPrimary.copy(alpha = 0.2f), RoundedCornerShape(24.dp)),
+                .border(1.dp, AiCyan.copy(alpha = 0.2f), RoundedCornerShape(24.dp)),
             colors = CardDefaults.cardColors(containerColor = CardSurface),
             shape = RoundedCornerShape(24.dp)
         ) {
@@ -292,18 +292,18 @@ fun QabasEmptyState(
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    GoldPrimary.copy(alpha = 0.25f),
+                                    AiCyan.copy(alpha = 0.28f),
                                     DeepSlate
                                 )
                             )
                         )
-                        .border(1.5.dp, GoldPrimary.copy(alpha = 0.4f), CircleShape),
+                        .border(1.5.dp, AiViolet.copy(alpha = 0.5f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = GoldPrimary,
+                        tint = AiCyan,
                         modifier = Modifier.size(42.dp)
                     )
                 }
@@ -334,7 +334,7 @@ fun QabasEmptyState(
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = onActionClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = AiCyan),
                         shape = RoundedCornerShape(14.dp),
                         modifier = Modifier.height(46.dp)
                     ) {
@@ -395,13 +395,13 @@ fun QabasLoadingState(
                 modifier = Modifier
                     .size(90.dp)
                     .clip(CircleShape)
-                    .background(GoldPrimary.copy(alpha = pulseAlpha * 0.2f))
-                    .border(2.dp, GoldPrimary.copy(alpha = pulseAlpha), CircleShape),
+                    .background(AiCyan.copy(alpha = pulseAlpha * 0.2f))
+                    .border(2.dp, AiCyan.copy(alpha = pulseAlpha), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(48.dp),
-                    color = GoldPrimary,
+                    color = AiCyanLight,
                     trackColor = DeepSlate,
                     strokeWidth = 3.5.dp
                 )
@@ -411,7 +411,7 @@ fun QabasLoadingState(
 
             Text(
                 text = message,
-                color = GoldPrimary,
+                color = AiCyanLight,
                 fontFamily = CairoFont,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
@@ -502,7 +502,7 @@ fun QabasErrorState(
 
                 Button(
                     onClick = onRetry,
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+                    colors = ButtonDefaults.buttonColors(containerColor = AiCyan),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(18.dp))
@@ -605,7 +605,7 @@ fun QabasGlowingSpinner(
     modifier: Modifier = Modifier,
     size: androidx.compose.ui.unit.Dp = 44.dp,
     strokeWidth: androidx.compose.ui.unit.Dp = 3.5.dp,
-    color: Color = GoldPrimary
+    color: Color = AiCyan
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "qabas_spinner_anim")
     val rotation by infiniteTransition.animateFloat(
@@ -688,8 +688,8 @@ fun QabasProgressBar(
         label = "shimmer_offset"
     )
 
-    val goldBarBrush = Brush.horizontalGradient(
-        colors = listOf(GoldSecondary, GoldPrimary, Color(0xFFFDE68A)),
+    val techBarBrush = Brush.horizontalGradient(
+        colors = listOf(AiViolet, AiCyan, AiCyanLight),
         startX = shimmerOffset - 300f,
         endX = shimmerOffset + 300f
     )
@@ -715,7 +715,7 @@ fun QabasProgressBar(
                 if (showPercentage) {
                     Text(
                         text = "${(animatedProgress * 100).toInt()}%",
-                        color = GoldPrimary,
+                        color = AiCyanLight,
                         fontFamily = RobotoMonoFont,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
@@ -739,7 +739,7 @@ fun QabasProgressBar(
                     .fillMaxWidth(animatedProgress)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(height / 2))
-                    .background(goldBarBrush)
+                    .background(techBarBrush)
             )
         }
 
@@ -785,13 +785,13 @@ fun QabasIndeterminateProgressBar(
             ) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(12.dp),
-                    color = GoldPrimary,
+                    color = AiCyan,
                     strokeWidth = 1.5.dp
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = label,
-                    color = GoldPrimary,
+                    color = AiCyanLight,
                     fontFamily = CairoFont,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
@@ -817,9 +817,9 @@ fun QabasIndeterminateProgressBar(
                             Brush.horizontalGradient(
                                 colors = listOf(
                                     Color.Transparent,
-                                    GoldSecondary.copy(alpha = 0.6f),
-                                    GoldPrimary,
-                                    GoldSecondary.copy(alpha = 0.6f),
+                                    AiViolet.copy(alpha = 0.55f),
+                                    AiCyanLight,
+                                    AiCyan.copy(alpha = 0.55f),
                                     Color.Transparent
                                 ),
                                 startX = slideAnim * 800f - 200f,
@@ -862,14 +862,14 @@ fun QabasStepProgressBar(
                             .clip(CircleShape)
                             .background(
                                 when {
-                                    isCompleted -> GoldPrimary
-                                    isCurrent -> GoldPrimary.copy(alpha = 0.25f)
+                                    isCompleted -> AiCyan
+                                    isCurrent -> AiCyan.copy(alpha = 0.25f)
                                     else -> Color(0xFF151B2B)
                                 }
                             )
                             .border(
                                 1.5.dp,
-                                if (isCompleted || isCurrent) GoldPrimary else Color(0xFF1E293B),
+                                if (isCompleted) AiCyan else if (isCurrent) AiViolet else Color(0xFF1E293B),
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
@@ -879,7 +879,7 @@ fun QabasStepProgressBar(
                         } else if (isCurrent) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(14.dp),
-                                color = GoldPrimary,
+                                color = AiCyan,
                                 strokeWidth = 1.5.dp
                             )
                         } else {
@@ -897,7 +897,7 @@ fun QabasStepProgressBar(
 
                     Text(
                         text = label,
-                        color = if (isCurrent || isCompleted) GoldPrimary else Color.Gray,
+                        color = if (isCompleted) AiCyanLight else if (isCurrent) AiVioletLight else Color.Gray,
                         fontFamily = CairoFont,
                         fontSize = 10.sp,
                         fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,

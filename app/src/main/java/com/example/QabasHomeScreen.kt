@@ -142,7 +142,7 @@ fun HomeScreen(
     val handlePremiumAction: (() -> Unit) -> Unit = { action ->
         action()
     }
-    val goldGradient = remember { Brush.horizontalGradient(colors = listOf(GoldSecondary, GoldPrimary)) }
+    val techGradient = remember { Brush.horizontalGradient(colors = listOf(AiCyan, AiViolet)) }
 
     var selectedCategoryTab by remember { mutableStateOf(0) }
     var showAutoSeriesDialog by remember { mutableStateOf(false) }
@@ -203,7 +203,7 @@ fun HomeScreen(
                             modifier = Modifier
                                 .size(34.dp)
                                 .clip(RoundedCornerShape(10.dp))
-                                .background(goldGradient),
+                                .background(techGradient),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(Icons.Default.MovieFilter, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(20.dp))
@@ -211,7 +211,7 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             Translator.tr("استوديو قبس"),
-                            color = GoldPrimary,
+                            color = AiCyanLight,
                             fontFamily = CairoFont,
                             fontWeight = FontWeight.Bold,
                             fontSize = 19.sp
@@ -225,24 +225,24 @@ fun HomeScreen(
                         Icon(
                             if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
                             contentDescription = Translator.tr("تبديل المظهر"),
-                            tint = GoldPrimary
+                            tint = AiCyan
                         )
                     }
                     IconButton(onClick = onViewNotifications) {
                         BadgedBox(
                             badge = { if (notifCount > 0) Badge { Text("$notifCount") } }
                         ) {
-                            Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = GoldPrimary)
+                            Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = AiCyan)
                         }
                     }
                     IconButton(onClick = onLeaderboard) {
-                        Icon(Icons.Default.EmojiEvents, contentDescription = Translator.tr("لوحة الشرف"), tint = GoldPrimary)
+                        Icon(Icons.Default.EmojiEvents, contentDescription = Translator.tr("لوحة الشرف"), tint = AiCyan)
                     }
                     IconButton(onClick = onViewSettings) {
                         Icon(Icons.Default.Settings, contentDescription = Translator.tr("الإعدادات"), tint = TextSecondary)
                     }
                     IconButton(onClick = onViewProfile) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = Translator.tr("الملف الشخصي"), tint = GoldPrimary)
+                        Icon(Icons.Default.AccountCircle, contentDescription = Translator.tr("الملف الشخصي"), tint = AiCyan)
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                 },

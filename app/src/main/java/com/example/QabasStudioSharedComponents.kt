@@ -44,7 +44,7 @@ fun TabHeaderButton(
     ) {
         Text(
             title,
-            color = if (isSelected) GoldPrimary else Color.Gray,
+            color = if (isSelected) AiCyanLight else Color.Gray,
             fontFamily = CairoFont,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             fontSize = 13.sp
@@ -56,7 +56,7 @@ fun TabHeaderButton(
                     .width(28.dp)
                     .height(3.dp)
                     .background(
-                        Brush.horizontalGradient(listOf(GoldPrimary, GoldSecondary)),
+                        Brush.horizontalGradient(listOf(AiCyan, AiViolet)),
                         RoundedCornerShape(2.dp)
                     )
             )
@@ -70,7 +70,7 @@ fun TabButton(title: String, isSelected: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * Unified luxury card for Qabas — standard gold-tinted glow border and rounded corners.
+ * Unified luxury card for Qabas — standard cyan/violet tech-glow border and rounded corners.
  * Use for project cards, list items and studio panels instead of ad-hoc Cards.
  */
 @Composable
@@ -91,7 +91,7 @@ fun QabasCard(
 }
 
 /**
- * Unified section header row — gold gradient title with optional subtitle, icon and trailing slot.
+ * Unified section header row — cyan accent title with optional subtitle, icon and trailing slot.
  */
 @Composable
 fun QabasSectionHeader(
@@ -109,13 +109,13 @@ fun QabasSectionHeader(
             Box(
                 modifier = Modifier
                     .size(34.dp)
-                    .background(GoldPrimary.copy(alpha = 0.14f), RoundedCornerShape(10.dp)),
+                    .background(AiCyan.copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = GoldPrimary,
+                    tint = AiCyan,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -124,7 +124,7 @@ fun QabasSectionHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = GoldPrimary,
+                color = AiCyanLight,
                 fontFamily = CairoFont,
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp
@@ -169,7 +169,7 @@ fun ReelHeroHeaderCard(
                 modifier = Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Brush.linearGradient(listOf(GoldPrimary, GoldSecondary))),
+                    .background(Brush.linearGradient(listOf(AiCyan, AiViolet))),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(icon, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(28.dp))
@@ -181,11 +181,11 @@ fun ReelHeroHeaderCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Box(
                         modifier = Modifier
-                            .background(GoldPrimary.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
-                            .border(1.dp, GoldPrimary.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
+                            .background(AiCyan.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
+                            .border(1.dp, AiCyan.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text(badgeText, color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(badgeText, color = AiCyanLight, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
                 Spacer(modifier = Modifier.height(2.dp))
@@ -264,11 +264,11 @@ fun ReelTemplateCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(GoldPrimary.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
-                        .border(1.dp, GoldPrimary.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                        .background(AiViolet.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
+                        .border(1.dp, AiViolet.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 4.dp)
                 ) {
-                    Text(template.category, color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(template.category, color = AiVioletLight, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -290,7 +290,7 @@ fun ReelTemplateCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFF0B0F19), RoundedCornerShape(10.dp))
-                    .border(1.dp, GoldPrimary.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                    .border(1.dp, AiViolet.copy(alpha = 0.3f), RoundedCornerShape(10.dp))
                     .padding(12.dp)
             ) {
                 Text(template.sampleScript, color = Color.White.copy(alpha = 0.9f), fontFamily = NotoSansFont, fontSize = 12.sp, lineHeight = 17.sp)
@@ -303,7 +303,7 @@ fun ReelTemplateCard(
                     onSelect(template.sampleScript)
                     Toast.makeText(context, "تم تطبيق القالب بنجاح! 🚀", Toast.LENGTH_SHORT).show()
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = AiCyan),
                 shape = RoundedCornerShape(10.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -341,12 +341,12 @@ fun ReelFeedCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Brush.verticalGradient(listOf(Color(0xFF151B2B), Color(0xFF0B0F19))))
+                    .background(Brush.verticalGradient(listOf(CardSurface, DeepSlate)))
             ) {
                 Icon(
                     Icons.Default.PlayCircleOutline,
                     contentDescription = null,
-                    tint = GoldPrimary.copy(alpha = 0.8f),
+                    tint = AiCyan.copy(alpha = 0.9f),
                     modifier = Modifier
                         .size(64.dp)
                         .align(Alignment.Center)
@@ -370,17 +370,17 @@ fun ReelFeedCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Visibility, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Visibility, contentDescription = null, tint = AiCyan, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(project.lastScreen.takeIf { it.isNotBlank() } ?: "10K مشاهدة", color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 12.sp)
+                        Text(project.lastScreen.takeIf { it.isNotBlank() } ?: "10K مشاهدة", color = AiCyanLight, fontFamily = NotoSansFont, fontSize = 12.sp)
                     }
 
                     Box(
                         modifier = Modifier
-                            .background(GoldPrimary.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                            .background(AiViolet.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text("أسلوب 9:16 احترافي", color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("أسلوب 9:16 احترافي", color = AiVioletLight, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
