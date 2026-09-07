@@ -54,6 +54,9 @@ object ApiKeysBackupManager {
             "pexels_key",
             "pixabay_key",
             "huggingface_key",
+            "azure_speech_key",
+            "azure_speech_region",
+            "elevenlabs_key",
             "firebase_key",
             "firebase_project_id",
             "firebase_app_id"
@@ -163,7 +166,7 @@ object ApiKeysBackupManager {
                         when {
                             keyName.contains("gemini") -> importedMap["gemini_key"] = valStr
                             keyName.contains("groq") -> importedMap["groq_key"] = valStr
-                            keyName.contains("azure_region") || (keyName.contains("region") && !keyName.contains("speech")) -> importedMap["azure_speech_region"] = valStr
+                            keyName.contains("azure_region") || keyName.endsWith("_region") || (keyName.contains("region") && !keyName.contains("speech")) -> importedMap["azure_speech_region"] = valStr
                             keyName.contains("azure") || keyName.contains("speech") -> importedMap["azure_speech_key"] = valStr
                             keyName.contains("eleven") -> importedMap["elevenlabs_key"] = valStr
                             keyName.contains("pexels") -> importedMap["pexels_key"] = valStr
@@ -222,6 +225,9 @@ fun ApiKeysScreen(onBack: () -> Unit) {
     var pixabayKey by remember { mutableStateOf(prefs.getString("pixabay_key", "") ?: "") }
     var huggingfaceKey by remember { mutableStateOf(prefs.getString("huggingface_key", "") ?: "") }
     var groqKey by remember { mutableStateOf(prefs.getString("groq_key", "") ?: "") }
+    var azureSpeechKey by remember { mutableStateOf(prefs.getString("azure_speech_key", "") ?: "") }
+    var azureSpeechRegion by remember { mutableStateOf(prefs.getString("azure_speech_region", "") ?: "") }
+    var elevenLabsKey by remember { mutableStateOf(prefs.getString("elevenlabs_key", "") ?: "") }
     var firebaseKey by remember { mutableStateOf(prefs.getString("firebase_key", "") ?: "") }
     
     var saveMessage by remember { mutableStateOf("") }
@@ -236,6 +242,9 @@ fun ApiKeysScreen(onBack: () -> Unit) {
         imported["pexels_key"]?.let { pexelsKey = it }
         imported["pixabay_key"]?.let { pixabayKey = it }
         imported["huggingface_key"]?.let { huggingfaceKey = it }
+        imported["azure_speech_key"]?.let { azureSpeechKey = it }
+        imported["azure_speech_region"]?.let { azureSpeechRegion = it }
+        imported["elevenlabs_key"]?.let { elevenLabsKey = it }
         imported["firebase_key"]?.let { firebaseKey = it }
     }
 
@@ -351,6 +360,55 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                item {
+                    // مجاني تماماً: بطاقة توضح أن التطبيق يعمل بلا أي مفتاح
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF10B981).copy(alpha = 0.08f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(20.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(
+                                    color = Color(0xFF10B981).copy(alpha = 0.2f),
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(42.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.PlayCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(22.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = Translator.tr("يعمل مجاناً دون أي مفتاح 🎉"),
+                                        color = Color(0xFF10B981),
+                                        fontFamily = CairoFont,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp
+                                    )
+                                    Text(
+                                        text = "التحليل المحلي + محرك النطق المدمج في أندرويد + محرك FFmpeg كلها مجانية وتعمل دون إنترنت.",
+                                        color = TextSecondary,
+                                        fontFamily = CairoFont,
+                                        fontSize = 12.sp,
+                                        lineHeight = 18.sp
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "المفاتيح أدناه اختيارية — أضفها فقط إذا أردت إخراجاً أذكى وأجمل (النصوص بالذكاء الاصطناعي، مقاطع B-Roll حقيقية، أصوات سينمائية). كل خدماتها لها طبقة مجانية.",
+                                color = TextPrimary,
+                                fontFamily = CairoFont,
+                                fontSize = 12.sp,
+                                lineHeight = 18.sp
+                            )
+                        }
+                    }
+                }
+
                 item {
                     // Operational Readiness Percentage Card
                     Card(
@@ -648,8 +706,37 @@ fun ApiKeysScreen(onBack: () -> Unit) {
 
                 item {
                     ApiKeyCard(
+                        serviceType = "azure",
+                        title = "4. Azure Speech (TTS)",
+                        description = "توليد تعليق صوتي عربي فصيح عالي الجودة بأصوات طبيعية (اختياري — عند غيابه يعمل محرك النطق المدمج مجاناً).",
+                        url = "https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices",
+                        instructions = "1. سجّل دخولاً في Azure (يمنحك حساباً مجانياً ومفتاحاً تجريبياً فوراً).\n2. أنشئ مورد من نوع Speech (الطبقة المجانية Free F0 مجانية للأبد).\n3. انسخ KEY 1 (المفتاح) والمنطقة Region (مثل eastus) من صفحة 'Keys and Endpoint' والصقهما هنا.",
+                        icon = Icons.Default.RecordVoiceOver,
+                        value = azureSpeechKey,
+                        onValueChange = { azureSpeechKey = it },
+                        secondaryFieldLabel = "المنطقة (Region)",
+                        secondaryValue = azureSpeechRegion,
+                        onSecondaryValueChange = { azureSpeechRegion = it }
+                    )
+                }
+
+                item {
+                    ApiKeyCard(
+                        serviceType = "elevenlabs",
+                        title = "5. ElevenLabs (TTS)",
+                        description = "أصوات سينمائية فائقة الواقعية للتعليق الصوتي (اختياري — طبقة مجانية محدودة بالشخصيات الشهرية).",
+                        url = "https://elevenlabs.io/app/settings/api-keys",
+                        instructions = "1. أنشئ حساباً مجانياً في elevenlabs.io.\n2. اذهب إلى Profile → Profile Settings → API Keys.\n3. انسخ المفتاح (يبدأ بـ xi-) والصقه هنا.",
+                        icon = Icons.Default.GraphicEq,
+                        value = elevenLabsKey,
+                        onValueChange = { elevenLabsKey = it }
+                    )
+                }
+
+                item {
+                    ApiKeyCard(
                         serviceType = "pexels",
-                        title = "4. Pexels API Key",
+                        title = "6. Pexels API Key",
                         description = Translator.tr("مكتبة الفيديوهات والصور المجانية عالية الجودة (طبيعة، مساجد، ومعالم إسلامية)."),
                         url = "https://www.pexels.com/api/",
                         instructions = "1. سجل دخولك في موقع Pexels.\n2. اذهب إلى Image & Video API.\n3. قم بتقديم طلب للحصول على مفتاح.",
@@ -662,7 +749,7 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                 item {
                     ApiKeyCard(
                         serviceType = "pixabay",
-                        title = "5. Pixabay API Key",
+                        title = "7. Pixabay API Key",
                         description = Translator.tr("مؤثرات بصرية وصوتية إضافية خالية من حقوق الطبع والنشر للمونتاج."),
                         url = "https://pixabay.com/api/docs/",
                         instructions = "1. سجل دخولك في Pixabay.\n2. اذهب لأسفل الصفحة واضغط على API.\n3. ستجد مفتاحك في قسم 'Search Images'.",
@@ -704,6 +791,9 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                                 .putString("pexels_key", pexelsKey.trim())
                                 .putString("pixabay_key", pixabayKey.trim())
                                 .putString("huggingface_key", huggingfaceKey.trim())
+                                .putString("azure_speech_key", azureSpeechKey.trim())
+                                .putString("azure_speech_region", azureSpeechRegion.trim())
+                                .putString("elevenlabs_key", elevenLabsKey.trim())
                                 .putString("firebase_key", firebaseKey.trim())
                                 .apply()
                             saveMessage = Translator.tr("تم حفظ وتحديث جميع المفاتيح بنجاح! ✨")
@@ -1076,7 +1166,7 @@ fun ApiKeyCard(
                         onClick = {
                             scope.launch {
                                 validationStatus = KeyValidationStatus.Testing
-                                val res = ApiKeyValidator.validateKey(serviceType, value)
+                                val res = ApiKeyValidator.validateKey(serviceType, value, secondaryValue)
                                 validationStatus = if (res.isValid) KeyValidationStatus.Valid(res) else KeyValidationStatus.Invalid(res)
                             }
                         },

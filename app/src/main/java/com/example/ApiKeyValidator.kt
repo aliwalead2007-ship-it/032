@@ -52,7 +52,7 @@ object ApiKeyValidator {
         .readTimeout(12, TimeUnit.SECONDS)
         .build()
 
-    suspend fun validateKey(serviceType: String, key: String): KeyValidationResult = withContext(Dispatchers.IO) {
+    suspend fun validateKey(serviceType: String, key: String, hint: String? = null): KeyValidationResult = withContext(Dispatchers.IO) {
         val trimmedKey = key.trim()
         if (trimmedKey.isEmpty()) {
             return@withContext KeyValidationResult(
@@ -327,6 +327,77 @@ object ApiKeyValidator {
                             rawError = bodyStr.take(200),
                             explanation = exp,
                             suggestedFix = fix
+                        )
+                    }
+                }
+                "azure" -> {
+                    val region = hint ?: ""
+                    if (region.isBlank()) {
+                        return@withContext KeyValidationResult(
+                            isValid = false,
+                            summary = "أدخل المنطقة أولا 🔴",
+                            explanation = "التحقق من Azure Speech يتطلب كتابة المنطقة (Region) مثل eastus بجانب المفتاح.",
+                            suggestedFix = "في صفحة Keys and Endpoint انسخ قيمة Location/Region والصقها في حقل المنطقة."
+                        )
+                    }
+                    val url = "https://$region.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("Ocp-Apim-Subscription-Key", trimmedKey)
+                        .build()
+                    val response = client.newCall(request).execute()
+                    val code = response.code
+                    val bodyStr = response.body?.string().orEmpty()
+
+                    if (response.isSuccessful) {
+                        SystemLogsManager.addLog("SUCCESS", "مفتاح Azure Speech متصل وسليم (Microsoft - 200 OK)", Color(0xFF4CAF50))
+                        return@withContext KeyValidationResult(
+                            isValid = true,
+                            summary = "متصل بالسيرفر ✅ (Azure Speech شغال حقيقياً)",
+                            errorCode = code,
+                            explanation = "تم التحقق الفعلي من مفتاح Azure Speech والمنطقة بنجاح. التعليق الصوتي العربي الفصيح جاهز للعمل.",
+                            suggestedFix = "المفتاح جاهز للاستخدام الفوري."
+                        )
+                    } else {
+                        SystemLogsManager.addLog("ERROR", "فشل التحقق من مفتاح Azure Speech ($code) - $bodyStr", Color(0xFFEF4444))
+                        return@withContext KeyValidationResult(
+                            isValid = false,
+                            summary = "غير متصل 🔴 (كود $code)",
+                            errorCode = code,
+                            rawError = bodyStr.take(200),
+                            explanation = "استجاب خادم Azure بالخطأ ($code). تأكد من صحة المفتاح والمنطقة معاً.",
+                            suggestedFix = "تأكد من نسخ KEY 1 والمنطقة الصحيحة من صفحة Keys and Endpoint في Azure."
+                        )
+                    }
+                }
+                "elevenlabs" -> {
+                    val url = "https://api.elevenlabs.io/v1/user/subscription"
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("xi-api-key", trimmedKey)
+                        .build()
+                    val response = client.newCall(request).execute()
+                    val code = response.code
+                    val bodyStr = response.body?.string().orEmpty()
+
+                    if (response.isSuccessful) {
+                        SystemLogsManager.addLog("SUCCESS", "مفتاح ElevenLabs متصل وسليم (ElevenLabs - 200 OK)", Color(0xFF4CAF50))
+                        return@withContext KeyValidationResult(
+                            isValid = true,
+                            summary = "متصل بالسيرفر ✅ (ElevenLabs شغال حقيقياً)",
+                            errorCode = code,
+                            explanation = "تم التحقق الفعلي من مفتاح ElevenLabs بنجاح. الأصوات السينمائية جاهزة للعمل.",
+                            suggestedFix = "المفتاح جاهز للاستخدام الفوري."
+                        )
+                    } else {
+                        SystemLogsManager.addLog("ERROR", "فشل التحقق من مفتاح ElevenLabs ($code) - $bodyStr", Color(0xFFEF4444))
+                        return@withContext KeyValidationResult(
+                            isValid = false,
+                            summary = "غير متصل 🔴 (كود $code)",
+                            errorCode = code,
+                            rawError = bodyStr.take(200),
+                            explanation = "استجاب خادم ElevenLabs بالخطأ ($code). تأكد من صحة المفتاح الذي يبدأ بـ xi-.",
+                            suggestedFix = "انسخ المفتاح كاملاً من الإعدادات → API Keys في حساب ElevenLabs."
                         )
                     }
                 }
