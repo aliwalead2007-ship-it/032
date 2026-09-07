@@ -68,3 +68,5 @@
 sync.remote: "git+https://github.com/aliwalead2007-ship-it/032.git"
 dolt:
     shared-server: true
+export:
+    auto: true
