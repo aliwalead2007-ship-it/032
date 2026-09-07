@@ -917,7 +917,6 @@ fun ApiKeysScreen(onBack: () -> Unit) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable
 private data class LiveServiceCheck(
     val type: String,
     val name: String,
@@ -1094,6 +1093,7 @@ fun LiveHealthCheckPanel() {
     }
 }
 
+@Composable
 fun ApiKeyCard(
     serviceType: String,
     title: String,
