@@ -16,8 +16,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArrayOf
-import kotlinx.serialization.encodeToJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import java.util.UUID
 
 /**
@@ -105,7 +104,7 @@ object SupabaseServices {
         suspend fun register(email: String, password: String): Boolean {
             if (!isSupabaseAvailable) return false
             return runCatching {
-                client.auth.signUp {
+                client.auth.signUpWith(Email) {
                     email = email
                     password = password
                 }
@@ -168,13 +167,15 @@ object SupabaseServices {
                     limit(1)
                 }.decodeListOrEmpty<UserRow>().firstOrNull()
                 existing ?: client.postgrest.from("users").upsert(
-                    jsonArrayOf(
-                        json.encodeToJsonElement(
-                            UserRow(
-                                id = UUID.randomUUID().toString(),
-                                externalId = externalId,
-                                email = email,
-                                name = name
+                    JsonArray(
+                        listOf(
+                            json.encodeToJsonElement(
+                                UserRow(
+                                    id = UUID.randomUUID().toString(),
+                                    externalId = externalId,
+                                    email = email,
+                                    name = name
+                                )
                             )
                         )
                     )
@@ -208,7 +209,7 @@ object SupabaseServices {
                     metadata = JsonObject(metadata.mapValues { (_, v) -> JsonPrimitive(v) })
                 )
                 client.postgrest.from("projects").insert(
-                    jsonArrayOf(json.encodeToJsonElement(row))
+                    JsonArray(listOf(json.encodeToJsonElement(row)))
                 ).decodeSingle<ProjectRow>()
             }.onFailure { Log.w(TAG, "saveProject failed: ${it.message}") }
                 .getOrNull()
