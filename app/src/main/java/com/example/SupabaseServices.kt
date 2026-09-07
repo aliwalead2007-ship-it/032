@@ -105,8 +105,8 @@ object SupabaseServices {
             if (!isSupabaseAvailable) return false
             return runCatching {
                 client.auth.signUpWith(Email) {
-                    email = email
-                    password = password
+                    this.email = email
+                    this.password = password
                 }
                 true
             }.onFailure { Log.w(TAG, "Supabase register failed: ${it.message}") }
