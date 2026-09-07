@@ -4,6 +4,7 @@ import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.user.UserSession
 import io.github.jan.supabase.storage.Storage
 import io.github.jan.supabase.functions.Functions
@@ -29,12 +30,10 @@ object SupabaseConfig {
 
     /** Reads SUPABASE_URL/SUPABASE_ANON_KEY from BuildConfig. Empty when not set. */
     val url: String
-        get() = runCatching { BuildConfig.SUPABASE_URL }.getOrNull?.takeIf { !it.isNullOrBlank() } ?: ""
+        get() = runCatching { BuildConfig.SUPABASE_URL }.getOrNull()?.takeIf { !it.isNullOrBlank() } ?: ""
 
     val key: String
-        get() = runCatching { BuildConfig.SUPABASE_ANON_KEY }.getOrNull?.takeIf { !it.isNullOrBlank() }
-            ?: runCatching { BuildConfig.SUPABASE_KEY }.getOrNull?.takeIf { !it.isNullOrBlank() }
-            ?: ""
+        get() = runCatching { BuildConfig.SUPABASE_ANON_KEY }.getOrNull()?.takeIf { !it.isNullOrBlank() } ?: ""
 
     /** Lazily created on first access. Safe to call from any thread. */
     val client: SupabaseClient

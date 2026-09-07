@@ -16,6 +16,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArrayOf
+import kotlinx.serialization.encodeToJsonElement
 import java.util.UUID
 
 /**
@@ -103,7 +105,10 @@ object SupabaseServices {
         suspend fun register(email: String, password: String): Boolean {
             if (!isSupabaseAvailable) return false
             return runCatching {
-                client.auth.signUp(email = email, password = password)
+                client.auth.signUp {
+                    email = email
+                    password = password
+                }
                 true
             }.onFailure { Log.w(TAG, "Supabase register failed: ${it.message}") }
                 .getOrDefault(false)
@@ -130,7 +135,7 @@ object SupabaseServices {
                 .getOrDefault(false)
         }
 
-        fun logout() {
+        suspend fun logout() {
             if (!isSupabaseAvailable) return
             runCatching { client.auth.signOut() }
                 .onFailure { Log.w(TAG, "Supabase logout failed: ${it.message}") }
@@ -144,7 +149,7 @@ object SupabaseServices {
         suspend fun ping(): Boolean {
             if (!isSupabaseAvailable) return false
             return runCatching {
-                client.postgrest.from("users").select().decodeListOrEmpty()
+                client.postgrest.from("users").select().decodeListOrEmpty<UserRow>()
                 true
             }.onFailure { Log.w(TAG, "Supabase ping failed: ${it.message}") }
                 .getOrDefault(false)
@@ -162,12 +167,16 @@ object SupabaseServices {
                     filter { eq("external_id", externalId) }
                     limit(1)
                 }.decodeListOrEmpty<UserRow>().firstOrNull()
-                existing ?: client.postgrest.from("users").insert(
-                    UserRow(
-                        id = UUID.randomUUID().toString(),
-                        externalId = externalId,
-                        email = email,
-                        name = name
+                existing ?: client.postgrest.from("users").upsert(
+                    jsonArrayOf(
+                        json.encodeToJsonElement(
+                            UserRow(
+                                id = UUID.randomUUID().toString(),
+                                externalId = externalId,
+                                email = email,
+                                name = name
+                            )
+                        )
                     )
                 ) {
                     onConflict = "external_id"
@@ -198,7 +207,9 @@ object SupabaseServices {
                     tags = JsonArray(tags.map { JsonPrimitive(it) }),
                     metadata = JsonObject(metadata.mapValues { (_, v) -> JsonPrimitive(v) })
                 )
-                client.postgrest.from("projects").insert(row).decodeSingle<ProjectRow>()
+                client.postgrest.from("projects").insert(
+                    jsonArrayOf(json.encodeToJsonElement(row))
+                ).decodeSingle<ProjectRow>()
             }.onFailure { Log.w(TAG, "saveProject failed: ${it.message}") }
                 .getOrNull()
         }
