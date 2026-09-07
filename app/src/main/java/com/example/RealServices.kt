@@ -17,6 +17,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.util.Locale
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 object RealGeminiService {
@@ -82,7 +84,7 @@ object RealGeminiService {
             
             val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
                 .post(requestBody)
                 .build()
                 
@@ -186,7 +188,7 @@ object RealGeminiService {
             }
 
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -254,7 +256,7 @@ object RealGeminiService {
             }
 
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -369,7 +371,7 @@ object RealGeminiService {
             }
 
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -634,7 +636,7 @@ object RealGeminiService {
             val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
             
             val httpRequest = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
                 .post(requestBody)
                 .build()
                 
@@ -830,7 +832,7 @@ object RealMediaLibraryService {
             
             val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaType())
             val request = Request.Builder()
-                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey")
+                .url("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey")
                 .post(requestBody)
                 .build()
                 
@@ -1080,9 +1082,80 @@ object RealElevenLabsService {
 
 object RealFFmpegService {
     suspend fun mergeVideo(segments: List<String>, outputPath: String, templateCommand: String): String = withContext(Dispatchers.IO) {
-        
-        kotlinx.coroutines.delay(2000)
-        return@withContext outputPath
+        val validSegments = segments.filter { it.isNotBlank() && File(it).exists() && File(it).length() > 0 }
+        if (validSegments.isEmpty()) {
+            SystemLogsManager.addLog("ERROR", "لا توجد مقاطع صالحة للدمج — فشل إخراج الفيديو", Color(0xFFEF4444))
+            return@withContext ""
+        }
+        try {
+            val context = AppServices.appContext
+            val ok = if (validSegments.size == 1) {
+                VideoProcessor.concatenateVideos(context, validSegments, outputPath)
+            } else {
+                VideoProcessor.concatenateVideosWithTransitions(context, validSegments, "dissolve", outputPath)
+            }
+            if (ok && VideoProcessor.isValidVideoFile(outputPath, minSizeBytes = 8_000L)) {
+                SystemLogsManager.addLog("SUCCESS", "تم دمج ${validSegments.size} مقاطع في ملف MP4 صالح ✅", Color(0xFF4CAF50))
+                return@withContext outputPath
+            }
+        } catch (e: Exception) {
+            Log.e("RealFFmpegService", "mergeVideo failed: ${e.message}", e)
+        }
+        SystemLogsManager.addLog("ERROR", "فشل دمج المقاطع في ملف فيديو صالح 🔴", Color(0xFFEF4444))
+        return@withContext ""
+    }
+}
+
+/**
+ * Android built-in TextToSpeech — الدائم والمجاني تماماً (لا يحتاج مفتاح API).
+ * يُستخدم كـ fallback عندما تغيب مفاتيح Azure/ElevenLabs أو تفشل الشبكة.
+ * يحوّل النص إلى ملف صوتي WAV عبر محرك النظام المحلي.
+ */
+object AndroidTTSService {
+    private const val TAG = "AndroidTTSService"
+
+    suspend fun synthesizeSpeech(text: String): String? = withContext(Dispatchers.IO) {
+        if (text.isBlank()) return@withContext null
+        val context = AppServices.appContext
+        val outFile = File(context.cacheDir, "android_tts_${System.currentTimeMillis()}.wav")
+        val latch = CountDownLatch(1)
+        val ready = arrayOf(false)
+
+        val tts = android.speech.tts.TextToSpeech(context) { status ->
+            try {
+                if (status != android.speech.tts.TextToSpeech.SUCCESS) {
+                    ready[0] = false
+                    latch.countDown()
+                    return@TextToSpeech
+                }
+                val langResult = tts.setLanguage(Locale("ar"))
+                if (langResult == android.speech.tts.TextToSpeech.LANG_MISSING_DATA ||
+                    langResult == android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED
+                ) {
+                    ready[0] = false
+                    latch.countDown()
+                    return@TextToSpeech
+                }
+                tts.setSpeechRate(1.0f)
+                val result = tts.synthesizeToFile(text, null, outFile, "qabas_tts")
+                ready[0] = result == android.speech.tts.TextToSpeech.SUCCESS
+                latch.countDown()
+            } catch (e: Exception) {
+                Log.e(TAG, "TTS init/synthesize error: ${e.message}")
+                ready[0] = false
+                latch.countDown()
+            }
+        }
+        val done = latch.await(15, TimeUnit.SECONDS)
+        try { tts.shutdown() } catch (_: Exception) {}
+
+        if (done && ready[0] && outFile.exists() && outFile.length() > 500) {
+            SystemLogsManager.addLog("SUCCESS", "تم توليد التعليق الصوتي عبر محرك النظام المجاني ✅", Color(0xFF4CAF50))
+            return@withContext outFile.absolutePath
+        }
+        try { outFile.delete() } catch (_: Exception) {}
+        SystemLogsManager.addLog("WARN", "تعذر توليد التعليق الصوتي حتى بمحرك النظام — سيتابع بدون صوت", Color(0xFFE8C547))
+        null
     }
 }
 
@@ -1584,11 +1657,20 @@ object AppServices {
             return@withContext generatedPath
         }
 
+        // Fallback مجاني تماماً: محرك النطق المدمج في أندرويد (لا يحتاج مفتاح API).
         // لا نحقن تلاوة يوسف أو مؤثرات عشوائية كتعليق صوتي — هذا محتوى خاطئ.
-        // المسار يستمر بدون صوت (VideoEngineManager يتعامل مع null بأمان).
+        try {
+            val systemTts = AndroidTTSService.synthesizeSpeech(text)
+            if (!systemTts.isNullOrBlank() && File(systemTts).exists() && File(systemTts).length() > 500) {
+                return@withContext systemTts
+            }
+        } catch (e: Exception) {
+            Log.w("AppServices", "Android TTS fallback failed: ${e.message}")
+        }
+
         SystemLogsManager.addLog(
             "WARN",
-            "تعذر توليد التعليق الصوتي (مفتاح TTS مفقود أو فشل الشبكة) — المشهد سيتابع بدون تعليق صوتي",
+            "تعذر توليد التعليق الصوتي (مفتاح TTS مفقود وغير متوفر محرك نظام) — المشهد سيتابع بدون تعليق صوتي",
             Color(0xFFE8C547)
         )
         Log.w("AppServices", "generateVoiceover failed for text length=${text.length} — returning null (no fake narration)")
