@@ -102,6 +102,21 @@
 - أصول B-Roll فيديو داخل `assets` (حالياً كاش + إطار صناعي).
 - فرض مسار صوت في الملف النهائي عند نجاح TTS.
 
+### هـ) تحسينات الطبقة المجانية (سبتمبر 2026)
+
+| ملف | ماذا أُنجز |
+|-----|------------|
+| `RealServices.kt` / `StyleBrain.kt` / `QabasBrainViewModel.kt` | ترقية نموذج Gemini `gemini-1.5-flash` → `gemini-2.0-flash` في كل نقاط الاتصال (8 مواضع) — أحدث وأفضل ومجاني. |
+| `RealServices.kt` — `RealFFmpegService.mergeVideo` | استبدال النموذج الأولي (no-op `delay(2000)`) بدمج حقيقي عبر `VideoProcessor.concatenateVideosWithTransitions` (xfade) مع فحص صلاحية MP4 وسجل واضح — لا عودة كاذبة. |
+| `RealServices.kt` — `AndroidTTSService` (جديد) | محرك النطق المدمج في أندرويد `TextToSpeech` (بلا مفتاح API، يعمل دون إنترنت) كـ fallback أخير في `generateVoiceover` — الفيديو لا يُترك بلا صوت عند غياب المفاتيح، دون حقن تلاوة خاطئة. |
+| `.env.example` | توثيق الطبقات المجانية لكل خدمة مع الروابط. **تحذير:** قيم placeholder يجب أن تبقى غير فارغة (`"your_key"`) وإلا انكسر `BuildConfig.java` (خطأ `illegal start of expression`). |
+| CI | تشغيل كامل أخضر بعد إصلاحين (capture TTS + قيم `.env.example`). |
+
+### و) دروس مستفادة (أخطاء حُلت في CI)
+
+1. **`TextToSpeech` capture:** لا تَستدعِ `tts.method()` داخل لامدا `TextToSpeech(context){...}` عبر الثابت الخارجي — استخدم `var tts: TextToSpeech? = null` ثم `val instance = tts ?: return@TextToSpeech` (اللامدا تُنفَّذ أثناء الإنشاء قبل اكتمال التخصيص).
+2. **`.env.example`:** القيمة الفارغة (`KEY=""`) تُنتج `BuildConfig` معطوباً (`String KEY = ;`). أبقِ دائماً قيمة placeholder غير فارغة.
+
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
@@ -163,4 +178,5 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 > المسار محصَّن في الكود؛ آية الدخول والسبلاش جاهزان؛ لوحة المطور خالية من البيانات المزيفة (مستخدمون/إيرادات/استهلاك API/عدّ أسبوعي حقيقي).  
 > **الأولوية:** نتيجة اختبار التصدير على الجهاز → ثم إصلاح أو تقوية offline فقط.  
 > لوحة المطور: 12 نقطة HTTP ملفوفة بـ `ApiUsageTracker`، وتحميل فعلي من Firestore/Supabase/Room.  
+> **سبتمبر 2026:** Gemini ↑ 2.0-flash، دمج FFmpeg حقيقي، تعليق صوتي مجاني دائماً (TTS النظام)، توثيق مجانيّ في `.env.example`، CI أخضر.  
 > وثّق كل حركة في `AGENTS.md` + `README.md`.

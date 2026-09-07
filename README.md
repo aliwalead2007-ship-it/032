@@ -97,7 +97,7 @@
    - **مُبتكر العناوين القاتلة (AI Viral Hook Generator):** توليد أطقم عناوين رئيسية وفرعية وشارات تنبيه قصيرة عالية التفاعل بالذكاء الاصطناعي بنقرة واحدة.
 
 41. **فحص ومراجعة الكود التامة وتصحيح روابط النماذج (`Full Codebase Audit & Gemini 1.5 Model Fix`):**
-   - **تصحيح نقاط الاتصال بنماذج الذكاء الاصطناعي (`RealServices.kt`):** تم تعديل جميع نقاط الاتصال المباشرة بروابط REST API الخاصة بـ Google AI Studio من النموذج غير المدعوم `gemini-3.5-flash` إلى النموذج الرسمي والمستقر `gemini-1.5-flash` لضمان عمل كافة ميزات الاستوديو بدون أي خطأ 404.
+    - **تصحيح نقاط الاتصال بنماذج الذكاء الاصطناعي (`RealServices.kt`):** تم تعديل جميع نقاط الاتصال المباشرة بروابط REST API الخاصة بـ Google AI Studio من النموذج غير المدعوم `gemini-3.5-flash` إلى نموذج رسمي ومستقر (`1.5` ثم لاحقاً `2.0-flash` في التحديث §64) لضمان عمل كافة ميزات الاستوديو بدون أي خطأ 404.
    - **فحص الأمان والسلامة الشبكية (`NetworkUtils.kt`):** التأكد من أن جميع الاستدعاءات المغلفة بـ `safeApiCall` تحمي التطبيق من الانهيار عند انقطاع الشبكة وتحول تلقائياً لوضع المحاكاة بسلاسة.
 
 42. **تطبيق محرك تحسين الذاكرة وتفادي خطأ OOM (`BitmapMemoryManager Engine`):**
@@ -370,9 +370,14 @@
   4. **معدل الإنتاج الأسبوعي الحقيقي:** `WeeklyEngagementTrendsChart` يعتمد على عدّ يومي من قاعدة البيانات المحلية (Room) لجداول `projects` / `reel_scripts` / `hadith_cards` عبر `countXBetween(start,end)` بدلاً من قيم الأسبوع المختلقة.
   5. **لا شاشات زيارة مختلقة:** استبدال أرقام الزيارات (84/67/52...) برسالة صادقة تنتظر التتبع الفعلي. معالج `formatRegDate` يعمل بـ `SimpleDateFormat` (بدون `java.time` لكي لا ينكسر على `minSdk=24`).
 
----
+### 64. ترقية Gemini + دمج FFmpeg حقيقي + تعليق صوتي مجاني دائماً (Gemini 2.0 · Real Merge · Always-Free TTS)
+- **ترقية النموذج إلى `gemini-2.0-flash`:** استبدال `gemini-1.5-flash` في كل نقاط اتصال REST (RealServices ×6، StyleBrain، QabasBrainViewModel) بنموذج 2.0 الأحدث والمجاني والأفضل جودة.
+- **`RealFFmpegService.mergeVideo` — دمج حقيقي بدل الوهمي:** استبدال النموذج الأولي (no-op `delay(2000)`) بدمج فعلي عبر `VideoProcessor.concatenateVideosWithTransitions` (انتقالات xfade) مع فحص صلاحية ملف MP4 الناتج وعرض سجل نجاح/فشل واضح.
+- **تعليق صوتي مجاني دائماً (`AndroidTTSService`):** محرك النطق المدمج في أندرويد `TextToSpeech` (بلا مفتاح API، يعمل دون إنترنت) كـ fallback أخير بعد Azure/ElevenLabs — فلا يُترك الفيديو بلا صوت إذا غابت المفاتيح أو فشلت الشبكة، دون حقن تلاوة خاطئة.
+- **توثيق الطبقات المجانية (`.env.example`):** إضافة روابط ومفاتيح كل خدمة (Gemini، Azure، ElevenLabs، Groq، Pexels، Pixabay، Supabase) مع شرح أن التطبيق يعمل بلا مفاتيح (محلل محلي + TTS مدمج). ملاحظة: يجب إبقاء قيم placeholder غير فارغة حتى لا ينكسر `BuildConfig.java`.
+- **CI أخضر:** تشغيل كامل ناجح (Compile Kotlin → Assemble Debug APK → Upload APK).
 
-## 🚦 5. حالة البناء وجاهزية استخراج الـ APK (Build Status & APK Extraction)
+---
 - **البناء:** نجح بناء التطبيق بالكامل بعد إصلاح تضارب الأسماء وتكرار الدوال في `DeveloperDashboardScreen.kt`. حزمة `Qabas-Studio-Debug-APK` جاهزة للبناء عبر GitHub Actions وGoogle AI Studio.
 - **إعداد ملفات البيئة (`.env` / `.env.example`):** قيم افتراضية آمنة لمنع أخطاء توليد `BuildConfig`.
 - **مسار CI/CD:** `.github/workflows/android.yml` — Java 21 + Gradle 9.3.1 + رفع الـ APK إلى Artifacts.
