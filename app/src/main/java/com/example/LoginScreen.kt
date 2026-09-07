@@ -3,14 +3,13 @@ package com.example
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
@@ -23,7 +22,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -56,8 +57,8 @@ fun LoginScreen(
         }
     }
 
-    val goldGradient = Brush.horizontalGradient(
-        colors = listOf(GoldSecondary, GoldPrimary, Color(0xFFFFF9C4), GoldPrimary)
+    val brandGradient = Brush.horizontalGradient(
+        colors = listOf(AiViolet, AiVioletDeep, AiGlowBlue, AiCyan)
     )
 
     Box(
@@ -83,51 +84,52 @@ fun LoginScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Studio Emblem
-            Surface(
-                color = CardSurface,
-                shape = CircleShape,
-                border = BorderStroke(1.5.dp, GoldPrimary.copy(alpha = 0.5f)),
-                modifier = Modifier.size(68.dp),
-                shadowElevation = 8.dp
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = "Qabas Studio Logo",
-                        tint = GoldPrimary,
-                        modifier = Modifier.size(34.dp)
-                    )
-                }
+            val logoPainter = runCatching { painterResource(id = R.drawable.qabas_logo) }.getOrNull()
+
+            if (logoPainter != null) {
+                Image(
+                    painter = logoPainter,
+                    contentDescription = "شعار قبس الرسمي",
+                    modifier = Modifier.fillMaxWidth(0.72f),
+                    contentScale = ContentScale.Fit
+                )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = "QABAS STUDIO",
-                color = GoldPrimary,
+                text = "أهلاً بك في قبس",
+                color = TextPrimary,
                 fontFamily = CairoFont,
                 fontWeight = FontWeight.Bold,
-                fontSize = 26.sp,
-                letterSpacing = 2.5.sp
+                fontSize = 24.sp,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "تسجيل الدخول لمتابعة إنتاجك الدعوي",
+                text = "استوديو الإنتاج وصناعة الأثر",
+                color = GoldPrimary,
+                fontFamily = CairoFont,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "سجّل دخولك لمواصلة إنتاجك الدعوي",
                 color = TextSecondary,
                 fontFamily = CairoFont,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Input Card
             Card(
@@ -146,17 +148,17 @@ fun LoginScreen(
                         onValueChange = { email = it },
                         label = { Text("البريد الإلكتروني", fontFamily = CairoFont) },
                         leadingIcon = {
-                            Icon(Icons.Default.Email, contentDescription = null, tint = GoldPrimary.copy(alpha = 0.8f))
+                            Icon(Icons.Default.Email, contentDescription = null, tint = AiCyan.copy(alpha = 0.85f))
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldPrimary,
+                            focusedBorderColor = AiViolet,
                             unfocusedBorderColor = Color(0xFF334155),
-                            focusedLabelColor = GoldPrimary,
+                            focusedLabelColor = AiViolet,
                             unfocusedLabelColor = Color.Gray,
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            cursorColor = GoldPrimary
+                            cursorColor = AiViolet
                         ),
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true
@@ -168,7 +170,7 @@ fun LoginScreen(
                         onValueChange = { password = it },
                         label = { Text("كلمة المرور", fontFamily = CairoFont) },
                         leadingIcon = {
-                            Icon(Icons.Default.Lock, contentDescription = null, tint = GoldPrimary.copy(alpha = 0.8f))
+                            Icon(Icons.Default.Lock, contentDescription = null, tint = AiCyan.copy(alpha = 0.85f))
                         },
                         visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                         trailingIcon = {
@@ -176,19 +178,19 @@ fun LoginScreen(
                                 Icon(
                                     imageVector = if (isPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                                     contentDescription = if (isPasswordVisible) "إخفاء كلمة المرور" else "إظهار كلمة المرور",
-                                    tint = GoldPrimary.copy(alpha = 0.7f)
+                                    tint = AiCyan.copy(alpha = 0.7f)
                                 )
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = GoldPrimary,
+                            focusedBorderColor = AiViolet,
                             unfocusedBorderColor = Color(0xFF334155),
-                            focusedLabelColor = GoldPrimary,
+                            focusedLabelColor = AiViolet,
                             unfocusedLabelColor = Color.Gray,
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
-                            cursorColor = GoldPrimary
+                            cursorColor = AiViolet
                         ),
                         shape = RoundedCornerShape(12.dp),
                         singleLine = true
@@ -204,9 +206,9 @@ fun LoginScreen(
                             checked = rememberMe,
                             onCheckedChange = { rememberMe = it },
                             colors = CheckboxDefaults.colors(
-                                checkedColor = GoldPrimary,
+                                checkedColor = AiViolet,
                                 uncheckedColor = Color(0xFF475569),
-                                checkmarkColor = DeepSlate
+                                checkmarkColor = Color.White
                             )
                         )
                         Spacer(modifier = Modifier.width(4.dp))
@@ -280,15 +282,15 @@ fun LoginScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .background(goldGradient),
+                                .background(brandGradient),
                             contentAlignment = Alignment.Center
                         ) {
                             if (isLoading) {
-                                CircularProgressIndicator(color = DeepSlate, modifier = Modifier.size(24.dp))
+                                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                             } else {
                                 Text(
                                     text = "تسجيل الدخول",
-                                    color = DeepSlate,
+                                    color = Color.White,
                                     fontFamily = CairoFont,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp
@@ -306,10 +308,10 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 TextButton(onClick = onNavigateToForgotPassword) {
-                    Text("نسيت كلمة المرور؟", color = GoldSecondary, fontFamily = CairoFont, fontSize = 13.sp)
+                    Text("نسيت كلمة المرور؟", color = AiCyan, fontFamily = CairoFont, fontSize = 13.sp)
                 }
                 TextButton(onClick = onNavigateToRegister) {
-                    Text("إنشاء حساب جديد", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text("إنشاء حساب جديد", color = AiVioletLight, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
             }
 
@@ -330,15 +332,15 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
-                border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, AiViolet.copy(alpha = 0.6f)),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Person, contentDescription = null, tint = AiViolet, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "الدخول كضيف وتجربة الاستوديو",
-                        color = GoldPrimary,
+                        color = AiVioletLight,
                         fontFamily = CairoFont,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp
