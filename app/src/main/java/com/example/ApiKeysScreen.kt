@@ -24,18 +24,46 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private val KEY_PATTERNS: Map<String, Regex> = mapOf(
+    "gemini" to Regex("""AIzaSy[A-Za-z0-9_\-]{33}"""),
+    "groq" to Regex("""(?:gsk_[A-Za-z0-9_\-]{10,}|xai-[A-Za-z0-9_\-]{10,})"""),
+    "huggingface" to Regex("""hf_[A-Za-z0-9]{10,}"""),
+    "elevenlabs" to Regex("""xi-[A-Za-z0-9_\-]{10,}"""),
+    "azure" to Regex("""(?i)[a-f0-9]{32}"""),
+    "pexels" to Regex("""(?<![A-Za-z0-9_-])[A-Za-z0-9]{56}(?![A-Za-z0-9_-])"""),
+    "pixabay" to Regex("""\d{7,10}-[a-f0-9]{16,32}""")
+)
+
+fun detectKeyForService(serviceType: String, text: String): String? {
+    val pattern = KEY_PATTERNS[serviceType.lowercase()] ?: return null
+    return pattern.find(text)?.value?.trim()
+}
+
+fun detectKeysForAutoFill(text: String): Map<String, String> {
+    val found = linkedMapOf<String, String>()
+    KEY_PATTERNS.forEach { (service, regex) ->
+        val match = regex.find(text)?.value?.trim()
+        if (!match.isNullOrBlank()) found[service] = match
+    }
+    return found
+}
 
 object ApiKeysBackupManager {
     fun generateExportJson(
@@ -666,6 +694,10 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                 }
 
                 item {
+                    LiveHealthCheckPanel()
+                }
+
+                item {
                     ApiKeyCard(
                         serviceType = "gemini",
                         title = "1. Gemini API (Google AI)",
@@ -886,6 +918,182 @@ fun ApiKeysScreen(onBack: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+private data class LiveServiceCheck(
+    val type: String,
+    val name: String,
+    val url: String,
+    val value: String,
+    val hint: String? = null,
+    val freeFallback: String,
+    var result: KeyValidationResult? = null,
+    var latencyMs: Long? = null
+)
+
+@Composable
+fun LiveHealthCheckPanel() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
+
+    val services = remember {
+        listOf(
+            LiveServiceCheck("gemini", "Gemini (ذكاء اصطناعي)", "https://aistudio.google.com/app/apikey", prefs.getString("gemini_key", "").orEmpty(), freeFallback = "المحلل المحلي + استخراج المشاهد البلاغية يعملان بلا مفتاح"),
+            LiveServiceCheck("groq", "Groq (نصوص فائقة السرعة)", "https://console.groq.com/keys", prefs.getString("groq_key", "").orEmpty(), freeFallback = "توليد النصوص يقع على المحرك المحلي و Gemini المجاني"),
+            LiveServiceCheck("huggingface", "HuggingFace (صور AI)", "https://huggingface.co/settings/tokens", prefs.getString("huggingface_key", "").orEmpty(), freeFallback = "توليد الصور محلياً عبر LocalImageAnalyzer"),
+            LiveServiceCheck("azure", "Azure TTS (نطق)", "https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices", prefs.getString("azure_speech_key", "").orEmpty(), prefs.getString("azure_speech_region", "").orEmpty(), freeFallback = "النطق المدمج في أندرويد (TextToSpeech) يعمل مجاناً دائماً"),
+            LiveServiceCheck("elevenlabs", "ElevenLabs (نطق)", "https://elevenlabs.io/app/settings/api-keys", prefs.getString("elevenlabs_key", "").orEmpty(), freeFallback = "النطق المدمج في أندرويد (TextToSpeech) يعمل مجاناً دائماً"),
+            LiveServiceCheck("pexels", "Pexels (B-Roll)", "https://www.pexels.com/api/", prefs.getString("pexels_key", "").orEmpty(), freeFallback = "كاش B-Roll المحلي + إطار آمن 1080×1920"),
+            LiveServiceCheck("pixabay", "Pixabay (B-Roll)", "https://pixabay.com/api/docs/", prefs.getString("pixabay_key", "").orEmpty(), freeFallback = "كاش B-Roll المحلي + إطار آمن 1080×1920")
+        )
+    }
+
+    var checks by remember { mutableStateOf(services) }
+    var running by remember { mutableStateOf(false) }
+
+    fun launchCheck() {
+        if (running) return
+        val pending = checks.any { it.value.isNotBlank() }
+        if (!pending) return
+        running = true
+        checks = checks.map { it.copy(result = null, latencyMs = null) }
+        checks.forEach { svc ->
+            val key = svc.value
+            if (key.isBlank()) return@forEach
+            scope.launch(Dispatchers.IO) {
+                val start = System.nanoTime()
+                val res = try {
+                    ApiKeyValidator.validateKey(context, svc.type, key, svc.hint)
+                } catch (e: Exception) {
+                    val message = e.message ?: "خطأ غير معروف"
+                    KeyValidationResult(
+                        isValid = false,
+                        summary = "تعذر الاتصال 🌐",
+                        explanation = "فشل الوصول لخادم ${svc.name}: $message",
+                        suggestedFix = "تحقق من اتصال الإنترنت بالمشروع، ثم أعد المحاولة."
+                    )
+                }
+                val latencyMs = (System.nanoTime() - start) / 1_000_000
+                withContext(Dispatchers.Main) {
+                    checks = checks.map { if (it.type == svc.type) it.copy(result = res, latencyMs = latencyMs) else it }
+                    if (checks.all { it.value.isBlank() || it.result != null }) running = false
+                }
+            }
+        }
+    }
+
+    var snapshot by remember { mutableStateOf<Map<String, ApiUsageTracker.ApiStat>?>(null) }
+    LaunchedEffect(Unit) {
+        snapshot = ApiUsageTracker.snapshot(context)
+    }
+
+    val totalCalls = snapshot?.values?.sumOf { it.totalCalls } ?: 0L
+    val successCalls = snapshot?.values?.sumOf { it.successCalls } ?: 0L
+    val successRate = if (totalCalls > 0) successCalls.toFloat() / totalCalls else 0f
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = CardSurface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.35f)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.HealthAndSafety, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(22.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text("فحص صحة المفاتيح الحي 🩺", color = GoldPrimary, fontFamily = CairoFont, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("قياس فوري للاتصال الفعلي وزمن الاستجابة لكل خدمة", color = TextSecondary, fontFamily = NotoSansFont, fontSize = 11.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            checks.forEach { svc ->
+                val statusColor = when {
+                    svc.value.isBlank() -> Color(0xFFEAB308)
+                    svc.result == null -> GoldPrimary
+                    svc.result!!.isValid -> Color(0xFF10B981)
+                    else -> Color(0xFFEF4444)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(svc.name, color = TextPrimary, fontFamily = CairoFont, fontSize = 12.5.sp, modifier = Modifier.weight(1f))
+                    when {
+                        svc.value.isBlank() -> Text("لا يوجد مفتاح 🟡", color = statusColor, fontFamily = CairoFont, fontSize = 11.sp)
+                        svc.result == null -> CircularProgressIndicator(color = statusColor, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                        svc.result!!.isValid -> Text("متصل ✅${svc.latencyMs?.let { " ($it ms)" } ?: ""}", color = statusColor, fontFamily = CairoFont, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        else -> Text("مرفوض 🔴", color = statusColor, fontFamily = CairoFont, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (svc.value.isBlank()) {
+                    Text("   🆓 ${svc.freeFallback}", color = TextSecondary, fontFamily = NotoSansFont, fontSize = 10.sp, modifier = Modifier.padding(start = 2.dp, bottom = 2.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = { launchCheck() },
+                enabled = !running,
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (running) "جاري فحص الاتصال الحي الآن..." else "🔍 فحص الاتصال الحي الآن",
+                    color = DeepSlate,
+                    fontFamily = CairoFont,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            val issues = checks.filter { it.value.isNotBlank() && it.result != null && !it.result!!.isValid }
+            if (issues.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("خطة الإصلاح المقترحة 🛡️", color = GoldPrimary, fontFamily = CairoFont, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(6.dp))
+                issues.forEach { svc ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("• ${svc.name}: ", color = TextPrimary, fontFamily = CairoFont, fontSize = 11.5.sp)
+                        Text(if (svc.result!!.suggestedFix.isNotBlank()) svc.result!!.suggestedFix else svc.result!!.explanation, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = {
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(svc.url)))
+                            } catch (e: Exception) {
+                                Toast.makeText(context, Translator.tr("تعذر فتح الرابط"), Toast.LENGTH_SHORT).show()
+                            }
+                        }) {
+                            Text("الموقع 🔗", color = GoldPrimary, fontFamily = CairoFont, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
+
+            if (totalCalls > 0) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Insights, contentDescription = null, tint = GoldSecondary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "📊 إجمالي المكالمات الحقيقية: $totalCalls · نجاح ${(successRate * 100).toInt()}% — التفاصيل في لوحة المطور",
+                        color = TextSecondary,
+                        fontFamily = NotoSansFont,
+                        fontSize = 10.5.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
 fun ApiKeyCard(
     serviceType: String,
     title: String,
@@ -907,6 +1115,34 @@ fun ApiKeyCard(
     val scope = rememberCoroutineScope()
 
     var showDiagnosticsDialog by remember { mutableStateOf(false) }
+
+    val clipboardManager = LocalClipboardManager.current
+    var lastClipboardSeen by remember { mutableStateOf("") }
+
+    fun captureKeyFromClipboard(showErrors: Boolean) {
+        val raw = clipboardManager.getText()?.text?.trim().orEmpty()
+        if (raw.isBlank()) {
+            if (showErrors) Toast.makeText(context, "الحافظة فارغة — انسخ المفتاح من موقع الخدمة أولاً", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (raw == lastClipboardSeen) {
+            if (showErrors) Toast.makeText(context, "الحافظة لا تحتوي مفتاحاً جديداً غير ما حاولنا سابقاً", Toast.LENGTH_SHORT).show()
+            return
+        }
+        lastClipboardSeen = raw
+        val found = detectKeyForService(serviceType, raw)
+        if (!found.isNullOrBlank() && found != value) {
+            onValueChange(found)
+            validationStatus = KeyValidationStatus.Testing
+            scope.launch {
+                val res = ApiKeyValidator.validateKey(context, serviceType, found, secondaryValue)
+                validationStatus = if (res.isValid) KeyValidationStatus.Valid(res) else KeyValidationStatus.Invalid(res)
+            }
+            Toast.makeText(context, "تم التقاط المفتاح من الحافظة تلقائياً ✅ (جارٍ التحقق الفعلي...)", Toast.LENGTH_LONG).show()
+        } else if (showErrors) {
+            Toast.makeText(context, "لم يتم العثور على مفتاح $title داخل الحافظة — تأكد من نسخه كاملاً", Toast.LENGTH_LONG).show()
+        }
+    }
 
     // Auto test on initial load if key exists
     LaunchedEffect(value) {
@@ -1015,6 +1251,24 @@ fun ApiKeyCard(
             
             Spacer(modifier = Modifier.height(12.dp))
             Text(description, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 14.sp, lineHeight = 20.sp)
+            if (value.isBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    color = Color(0xFF10B981).copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "🆓 بدون هذا المفتاح يعمل التطبيق مجاناً تلقائياً بالبديل المحلي داخل الجهاز — هذا المفتاح اختياري للترقية فقط.",
+                        color = Color(0xFF34D399),
+                        fontFamily = CairoFont,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp,
+                        modifier = Modifier.padding(10.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(14.dp))
             
             OutlinedTextField(
@@ -1023,7 +1277,16 @@ fun ApiKeyCard(
                     onValueChange(it)
                     validationStatus = KeyValidationStatus.Idle
                 },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focusState ->
+                        if (focusState.isFocused && value.isBlank()) {
+                            val raw = clipboardManager.getText()?.text?.trim().orEmpty()
+                            if (raw.isNotBlank() && raw != lastClipboardSeen) {
+                                captureKeyFromClipboard(showErrors = false)
+                            }
+                        }
+                    },
                 placeholder = { Text(Translator.tr("الصق المفتاح هنا..."), color = Color.Gray, fontFamily = NotoSansFont, fontSize = 14.sp) },
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = GoldPrimary,
@@ -1046,7 +1309,41 @@ fun ApiKeyCard(
                                 tint = GoldPrimary
                             )
                         }
-                        if (value.isNotBlank()) {
+if (value.isBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { captureKeyFromClipboard(showErrors = true) },
+                        modifier = Modifier.weight(1f).height(38.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.6f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("التقاط من الحافظة 📋", color = GoldPrimary, fontFamily = CairoFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Toast.makeText(context, Translator.tr("تعذر فتح الرابط"), Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        modifier = Modifier.height(38.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null, tint = GoldSecondary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("افتح الموقع", color = GoldSecondary, fontFamily = CairoFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else if (value.isNotBlank()) {
                             Icon(
                                 imageVector = when (validationStatus) {
                                     is KeyValidationStatus.Valid -> Icons.Default.CheckCircle

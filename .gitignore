@@ -22,3 +22,9 @@ debug.keystore
 *.db
 .beads-credential-key
 .beads/proxieddb/
+
+# Agent tooling (machine-local, not part of the product)
+.beads/hooks/
+.agents/
+.claude/
+.codex/

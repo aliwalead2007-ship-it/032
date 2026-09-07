@@ -25,8 +25,32 @@ object SupabaseConfig {
     @Volatile
     private var _client: SupabaseClient? = null
 
+    /**
+     * True only when BuildConfig carries a *real* Supabase URL + anon key.
+     * Placeholder values from `.env.example` (e.g. YOUR_PROJECT_REF, your_key)
+     * are rejected so a CI-built APK degrades to local mode instead of
+     * silently trying to reach a fake endpoint.
+     */
     val isConfigured: Boolean
-        get() = url.isNotBlank() && key.isNotBlank()
+        get() = isRealUrl(url) && isRealKey(key)
+
+    private fun isRealUrl(u: String): Boolean =
+        u.isNotBlank() &&
+            u.startsWith("https://") &&
+            u.contains("supabase.co") &&
+            !containsPlaceholder(u)
+
+    private fun isRealKey(k: String): Boolean =
+        k.isNotBlank() && !containsPlaceholder(k)
+
+    private fun containsPlaceholder(v: String): Boolean {
+        val l = v.lowercase()
+        return l.contains("your_") ||
+            l.contains("example") ||
+            l.contains("placeholder") ||
+            l.contains("replace") ||
+            l.contains("invalid")
+    }
 
     /** Reads SUPABASE_URL/SUPABASE_ANON_KEY from BuildConfig. Empty when not set. */
     val url: String

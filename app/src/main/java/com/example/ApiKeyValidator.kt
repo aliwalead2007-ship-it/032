@@ -68,7 +68,7 @@ object ApiKeyValidator {
                 "gemini" -> {
                     val url = "https://generativelanguage.googleapis.com/v1beta/models?key=$trimmedKey"
                     val request = Request.Builder().url(url).build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(context, "Gemini") { client.newCall(request).execute() }
                     val code = response.code
                     val bodyStr = response.body?.string().orEmpty()
 
@@ -118,7 +118,7 @@ object ApiKeyValidator {
                             .url(url)
                             .header("Authorization", "Bearer $trimmedKey")
                             .build()
-                        val response = client.newCall(request).execute()
+                        val response = ApiUsageTracker.track(context, "Groq") { client.newCall(request).execute() }
                         val code = response.code
                         val bodyStr = response.body?.string().orEmpty()
 
@@ -166,7 +166,7 @@ object ApiKeyValidator {
                             .url(url)
                             .header("Authorization", "Bearer $trimmedKey")
                             .build()
-                        val response = client.newCall(request).execute()
+                        val response = ApiUsageTracker.track(context, "Groq") { client.newCall(request).execute() }
                         val code = response.code
                         val bodyStr = response.body?.string().orEmpty()
 
@@ -212,7 +212,7 @@ object ApiKeyValidator {
                         .url(url)
                         .header("Authorization", "Bearer $trimmedKey")
                         .build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(context, "HuggingFace") { client.newCall(request).execute() }
                     val code = response.code
                     val bodyStr = response.body?.string().orEmpty()
 
@@ -253,7 +253,7 @@ object ApiKeyValidator {
                         .url(url)
                         .header("Authorization", trimmedKey)
                         .build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(context, "Pexels") { client.newCall(request).execute() }
                     val code = response.code
                     val bodyStr = response.body?.string().orEmpty()
 
@@ -295,7 +295,7 @@ object ApiKeyValidator {
                 "pixabay" -> {
                     val url = "https://pixabay.com/api/?key=$trimmedKey&q=nature"
                     val request = Request.Builder().url(url).build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(context, "Pixabay") { client.newCall(request).execute() }
                     val code = response.code
                     val bodyStr = response.body?.string().orEmpty()
 
