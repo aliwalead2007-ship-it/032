@@ -56,6 +56,20 @@ object SupabaseServices {
     )
 
     @Serializable
+    data class HadithRow(
+        val id: String,
+        val title: String,
+        val narrator: String,
+        val text: String,
+        val status: String,
+        val source: String,
+        @SerialName("theme_bg") val themeBg: String = "black_gold",
+        @SerialName("suggested_aspect") val suggestedAspect: String = "9:16",
+        @SerialName("display_order") val displayOrder: Int = 0,
+        @SerialName("is_active") val isActive: Boolean = true
+    )
+
+    @Serializable
     data class ProjectRow(
         val id: String,
         @SerialName("user_id") val userId: String? = null,
@@ -211,6 +225,23 @@ object SupabaseServices {
                 }
             }
         ).toString()
+
+        /**
+         * Fetch the active hadith preset catalog from the cloud. Ordered by
+         * `display_order` so admins control the sequence. Returns an empty
+         * list when Supabase is unavailable so callers can fall back to a
+         * hard-coded list without crashing.
+         */
+        suspend fun getHadithPresets(): List<HadithRow> {
+            if (!isSupabaseAvailable) return emptyList()
+            return runCatching {
+                client.postgrest.from("hadith_presets").select {
+                    filter { eq("is_active", true) }
+                    order("display_order", Order.ASCENDING)
+                }.decodeList<HadithRow>()
+            }.onFailure { Log.w(TAG, "getHadithPresets failed: ${it.message}") }
+                .getOrDefault(emptyList())
+        }
     }
 }
 

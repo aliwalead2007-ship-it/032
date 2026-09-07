@@ -8,6 +8,8 @@ package com.example
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 
 @Composable
 fun AppNavigation(
@@ -120,6 +122,21 @@ fun AppNavigation(
                             appState = AppState.ADVANCED_EDIT
                         )
                     }
+                    // Persist PhotoStudio export to Supabase so it shows up
+                    // in cloud history alongside the local Room copy.
+                    viewModel.viewModelScope.launch {
+                        SupabaseServices.Database.saveProject(
+                            title = "استوديو الصور - فيديو سريع",
+                            description = "تم توليد الفيديو من استوديو الصور",
+                            status = "ready",
+                            cost = 0.0,
+                            tags = listOf("photo_studio", "generated"),
+                            metadata = mapOf(
+                                "sourceType" to "photo_studio",
+                                "videoPath" to videoPath
+                            )
+                        )
+                    }
                 },
                 onSaveProject = { videoPath ->
                     viewModel.createProject("استوديو الصور - فيديو سريع")
@@ -127,6 +144,20 @@ fun AppNavigation(
                         copy(
                             appState = AppState.PROJECTS,
                             finalVideoPath = videoPath
+                        )
+                    }
+                    // Persist PhotoStudio export to Supabase cloud history.
+                    viewModel.viewModelScope.launch {
+                        SupabaseServices.Database.saveProject(
+                            title = "استوديو الصور - فيديو سريع",
+                            description = "تم توليد الفيديو من استوديو الصور",
+                            status = "ready",
+                            cost = 0.0,
+                            tags = listOf("photo_studio", "saved"),
+                            metadata = mapOf(
+                                "sourceType" to "photo_studio",
+                                "videoPath" to videoPath
+                            )
                         )
                     }
                 }

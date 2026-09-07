@@ -1,5 +1,8 @@
 package com.example
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +39,11 @@ import com.example.ui.theme.GoldPrimary
 import com.example.ui.theme.NotoSansFont
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+
+/** Identifies which YouTube tool the user just launched. */
+private enum class YouTubeTool { SILENCE, AUDIO_CLEAN, REELS, CHAPTERS, SUBTITLES }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,8 +52,80 @@ fun YouTubeStudioScreen(
     onStartSeries: () -> Unit = {},
     onStartEpisode: (title: String, scriptText: String, format: String) -> Unit = { _, _, _ -> }
 ) {
+    val context = LocalContext.current
     var showThumbnailDialog by remember { mutableStateOf(false) }
     var showSeriesDialog by remember { mutableStateOf(false) }
+
+    // State for the five new FFmpeg-backed tools.
+    // The picker fires the launchActivityForResult; once the user chooses a
+    // video we route it into the right YouTubeStudioEngine function.
+    var pendingVideoUri by remember { mutableStateOf<Uri?>(null) }
+    var activeTool by remember { mutableStateOf<YouTubeTool?>(null) }
+    var processingLabel by remember { mutableStateOf("") }
+    var processingDone by remember { mutableStateOf(false) }
+    var processingResult by remember { mutableStateOf<String?>(null) }
+
+    // Video is required for tools that operate on footage.
+    val videoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) pendingVideoUri = uri
+    }
+
+    fun launchTool(tool: YouTubeTool) {
+        val label = when (tool) {
+            YouTubeTool.SILENCE -> "إزالة الصمت"
+            YouTubeTool.AUDIO_CLEAN -> "تصفية الصوت"
+            YouTubeTool.REELS -> "تقطيع للريلز"
+            YouTubeTool.CHAPTERS -> "توليد الفصول الزمنية"
+            YouTubeTool.SUBTITLES -> "إضافة ترجمة"
+        }
+        processingResult = null
+        processingDone = false
+        processingLabel = label
+        activeTool = tool
+    }
+
+    // When the picker delivers a uri, dispatch to the engine.
+    LaunchedEffect(pendingVideoUri, activeTool) {
+        val uri = pendingVideoUri ?: return@LaunchedEffect
+        val tool = activeTool ?: return@LaunchedEffect
+        pendingVideoUri = null  // consume
+        // Copy the picked video into cache so the engine reads a stable path.
+        val inputFile = File(context.cacheDir, "yt_input_${System.currentTimeMillis()}.mp4")
+        withContext(kotlinx.coroutines.Dispatchers.IO) {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                inputFile.outputStream().use { input.copyTo(it) }
+            }
+        }
+        if (!inputFile.exists() || inputFile.length() == 0L) {
+            processingResult = "تعذّر قراءة ملف الفيديو. تأكد من صلاحيات الوصول."
+            processingDone = true
+            return@LaunchedEffect
+        }
+        val inputPath = inputFile.absolutePath
+        val outputPath = File(context.cacheDir, "yt_output_${System.currentTimeMillis()}.mp4").absolutePath
+        val result: Any = when (tool) {
+            YouTubeTool.SILENCE -> YouTubeStudioEngine.removeSilence(context, inputPath, outputPath)
+            YouTubeTool.AUDIO_CLEAN -> YouTubeStudioEngine.cleanupAudio(context, inputPath, outputPath)
+            YouTubeTool.REELS -> YouTubeStudioEngine.extractReelsClips(context, inputPath).size
+            YouTubeTool.CHAPTERS -> YouTubeStudioEngine.generateChapters(context, inputPath) ?: ""
+            YouTubeTool.SUBTITLES -> YouTubeStudioEngine.burnSubtitles(
+                context,
+                inputPath,
+                caption = "اشترك في القناة وفعّل الجرس 🔔",
+                outputPath = outputPath
+            )
+        }
+        processingResult = when (tool) {
+            YouTubeTool.REELS -> "تم استخراج $result مقطع للريلز في ذاكرة التخزين المؤقت."
+            YouTubeTool.CHAPTERS ->
+                if ((result as String).isBlank()) "لم يتم العثور على فصول زمنية في الفيديو." else "تم حفظ الفصول الزمنية: $result"
+            YouTubeTool.SILENCE, YouTubeTool.AUDIO_CLEAN, YouTubeTool.SUBTITLES ->
+                if (result as Boolean) "تم! الناتج محفوظ في: $outputPath" else "فشلت العملية. راجع السجلات."
+        }
+        processingDone = true
+    }
 
     if (showThumbnailDialog) {
         AutoThumbnailGeneratorDialog(
@@ -70,6 +150,86 @@ fun YouTubeStudioScreen(
                 onStartEpisode(ep.title, fullScript, format)
             }
         )
+    }
+
+    // Processing dialog shown while a YouTube tool runs and again with the
+    // final result once FFmpeg finishes.
+    if (activeTool != null) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = {
+            activeTool = null
+            processingDone = false
+            processingResult = null
+        }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF141414)),
+                shape = RoundedCornerShape(20.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF333333))
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        processingLabel,
+                        color = GoldPrimary,
+                        fontFamily = CairoFont,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    if (pendingVideoUri == null && !processingDone) {
+                        Text(
+                            "اختر ملف فيديو للمعالجة",
+                            color = Color.White,
+                            fontFamily = CairoFont,
+                            fontSize = 14.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = {
+                                videoPicker.launch(arrayOf("video/*"))
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = null, tint = DeepSlate)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("اختيار فيديو", color = DeepSlate, fontFamily = CairoFont, fontWeight = FontWeight.Bold)
+                        }
+                    } else if (!processingDone) {
+                        CircularProgressIndicator(color = GoldPrimary)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "جاري المعالجة بواسطة FFmpeg…",
+                            color = Color.Gray,
+                            fontFamily = NotoSansFont,
+                            fontSize = 13.sp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = GoldPrimary,
+                            modifier = Modifier.size(36.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            processingResult ?: "تمت العملية.",
+                            color = Color.White,
+                            fontFamily = NotoSansFont,
+                            fontSize = 13.sp
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        TextButton(onClick = {
+                            activeTool = null
+                            processingDone = false
+                            processingResult = null
+                        }) { Text("إغلاق", color = GoldPrimary, fontFamily = CairoFont) }
+                    }
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -139,11 +299,11 @@ fun YouTubeStudioScreen(
             item {
                 val tools = listOf(
                     ToolItem(Translator.tr("صورة وعنوان"), Translator.tr("توليد صورة مصغرة جذابة وعناوين يوتيوب مقترحة للفت الانتباه."), Icons.Default.Image, Color(0xFFF44336), "thumbnail"),
-                    ToolItem(Translator.tr("إزالة الصمت"), Translator.tr("إزالة تلقائية للوقفات الطويلة والمترددة لزيادة التفاعل."), Icons.Default.ContentCut, Color(0xFFE91E63)),
-                    ToolItem(Translator.tr("تصفية الصوت"), Translator.tr("إزالة ضجيج الخلفية وتضخيم الصوت ليكون بجودة البودكاست."), Icons.Default.GraphicEq, Color(0xFF2196F3)),
-                    ToolItem(Translator.tr("تقطيع للريلز"), Translator.tr("استخراج أهم 5 لقطات قصيرة ونشرها على يوتيوب شورتس."), Icons.Default.VideoLibrary, Color(0xFF9C27B0)),
-                    ToolItem(Translator.tr("الفصول الزمنية"), Translator.tr("توليد فصول وعناوين لليوتيوب تلقائياً مع التوقيت."), Icons.Default.FormatListNumbered, Color(0xFFFF9800)),
-                    ToolItem(Translator.tr("ترجمة احترافية"), Translator.tr("إضافة نص تفاعلي متحرك أسفل الفيديو بـ 30 لغة."), Icons.Default.Subtitles, Color(0xFF4CAF50))
+                    ToolItem(Translator.tr("إزالة الصمت"), Translator.tr("إزالة تلقائية للوقفات الطويلة والمترددة لزيادة التفاعل."), Icons.Default.ContentCut, Color(0xFFE91E63), "silence"),
+                    ToolItem(Translator.tr("تصفية الصوت"), Translator.tr("إزالة ضجيج الخلفية وتضخيم الصوت ليكون بجودة البودكاست."), Icons.Default.GraphicEq, Color(0xFF2196F3), "audio"),
+                    ToolItem(Translator.tr("تقطيع للريلز"), Translator.tr("استخراج أهم 5 لقطات قصيرة ونشرها على يوتيوب شورتس."), Icons.Default.VideoLibrary, Color(0xFF9C27B0), "reels"),
+                    ToolItem(Translator.tr("الفصول الزمنية"), Translator.tr("توليد فصول وعناوين لليوتيوب تلقائياً مع التوقيت."), Icons.Default.FormatListNumbered, Color(0xFFFF9800), "chapters"),
+                    ToolItem(Translator.tr("ترجمة احترافية"), Translator.tr("إضافة نص تفاعلي متحرك أسفل الفيديو بـ 30 لغة."), Icons.Default.Subtitles, Color(0xFF4CAF50), "subtitles")
                 )
 
                 LazyVerticalGrid(
@@ -155,8 +315,13 @@ fun YouTubeStudioScreen(
                 ) {
                     items(tools) { tool ->
                         ToolCard(tool = tool, onClick = {
-                            if (tool.id == "thumbnail") {
-                                showThumbnailDialog = true
+                            when (tool.id) {
+                                "thumbnail" -> showThumbnailDialog = true
+                                "silence"    -> launchTool(YouTubeTool.SILENCE)
+                                "audio"      -> launchTool(YouTubeTool.AUDIO_CLEAN)
+                                "reels"      -> launchTool(YouTubeTool.REELS)
+                                "chapters"   -> launchTool(YouTubeTool.CHAPTERS)
+                                "subtitles"  -> launchTool(YouTubeTool.SUBTITLES)
                             }
                         })
                     }

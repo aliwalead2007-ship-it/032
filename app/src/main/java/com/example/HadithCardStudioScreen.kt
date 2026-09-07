@@ -79,8 +79,9 @@ fun HadithCardStudioScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Sample Famous Hadiths
-    val presets = remember {
+    // Sample Famous Hadiths (local fallback catalog). The cloud-fetched
+    // list at [presets] replaces this when Supabase is reachable.
+    val localPresets = remember {
         listOf(
             HadithPreset(
                 title = "إنما الأعمال بالنيات",
@@ -142,6 +143,30 @@ fun HadithCardStudioScreen(
     }
 
     // Themes List
+    // Cloud-fetchable preset catalog. Starts as localPresets, replaced
+    // by the Supabase rows on first successful fetch.
+    var presets by remember { mutableStateOf<List<HadithPreset>>(localPresets) }
+    var presetsSource by remember { mutableStateOf("محلي") }
+
+    LaunchedEffect(Unit) {
+        // Best-effort sync. Local list stays put if Supabase is offline.
+        val cloud = SupabaseServices.Database.getHadithPresets()
+        if (cloud.isNotEmpty()) {
+            presets = cloud.map { row ->
+                HadithPreset(
+                    title = row.title,
+                    narrator = row.narrator,
+                    text = row.text,
+                    status = row.status,
+                    source = row.source,
+                    themeBg = row.themeBg,
+                    suggestedAspect = row.suggestedAspect
+                )
+            }
+            presetsSource = "سحابي (${cloud.size})"
+        }
+    }
+
     val themes = remember {
         listOf(
             HadithTheme(
@@ -227,7 +252,7 @@ fun HadithCardStudioScreen(
                             fontSize = 18.sp
                         )
                         Text(
-                            "توليد بطاقات دعوية مصورة فاخرة بالذكاء الاصطناعي",
+                            "توليد بطاقات دعوية مصورة فاخرة • مصدر الأحاديث: $presetsSource",
                             color = TextSecondary,
                             fontFamily = CairoFont,
                             fontSize = 11.sp
