@@ -1475,96 +1475,44 @@ object AppServices {
     }
 
     private fun createSolidFallbackImage(text: String, colors: String = "", visualEffect: String = ""): File? {
-        var bitmap: Bitmap? = null
+        val combined = "$colors $visualEffect".lowercase()
+        val primaryColorHex = when {
+            combined.contains("أخضر") || combined.contains("emerald") || combined.contains("green") -> "#10B981"
+            combined.contains("نيون") || combined.contains("neon") || combined.contains("أصفر") || combined.contains("yellow") -> "#FFE500"
+            combined.contains("برتقالي") || combined.contains("غروب") || combined.contains("orange") -> "#F97316"
+            combined.contains("أزرق") || combined.contains("blue") || combined.contains("سماوي") -> "#38BDF8"
+            combined.contains("أبيض") || combined.contains("white") -> "#F8FAFC"
+            else -> "#E8C547"
+        }
+        val bgColorHex = when {
+            combined.contains("أخضر") || combined.contains("emerald") -> "#0F291E"
+            combined.contains("أزرق") || combined.contains("blue") -> "#0A192F"
+            combined.contains("برتقالي") || combined.contains("sunset") -> "#1E1005"
+            else -> "#0B0F19"
+        }
+        val cardColorHex = when {
+            combined.contains("أخضر") -> "#16382B"
+            combined.contains("أزرق") -> "#13233E"
+            combined.contains("برتقالي") -> "#2D170A"
+            else -> "#151B2B"
+        }
         return try {
-            val width = 1080
-            val height = 1920
-            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-
-            val combined = "$colors $visualEffect".lowercase()
-            val primaryColorHex = when {
-                combined.contains("أخضر") || combined.contains("emerald") || combined.contains("green") -> "#10B981"
-                combined.contains("نيون") || combined.contains("neon") || combined.contains("أصفر") || combined.contains("yellow") -> "#FFE500"
-                combined.contains("برتقالي") || combined.contains("غروب") || combined.contains("orange") -> "#F97316"
-                combined.contains("أزرق") || combined.contains("blue") || combined.contains("سماوي") -> "#38BDF8"
-                combined.contains("أبيض") || combined.contains("white") -> "#F8FAFC"
-                else -> "#E8C547" // Gold Primary
-            }
-            val bgColorHex = when {
-                combined.contains("أخضر") || combined.contains("emerald") -> "#0F291E"
-                combined.contains("أزرق") || combined.contains("blue") -> "#0A192F"
-                combined.contains("برتقالي") || combined.contains("sunset") -> "#1E1005"
-                else -> "#0B0F19" // Deep Slate
-            }
-            val cardColorHex = when {
-                combined.contains("أخضر") -> "#16382B"
-                combined.contains("أزرق") -> "#13233E"
-                combined.contains("برتقالي") -> "#2D170A"
-                else -> "#151B2B" // Card Surface
-            }
-
-            canvas.drawColor(android.graphics.Color.parseColor(bgColorHex))
-            
-            val borderPaint = Paint().apply {
-                color = android.graphics.Color.parseColor(primaryColorHex)
-                style = Paint.Style.STROKE
-                strokeWidth = 6f
-                isAntiAlias = true
-            }
-            val rect = RectF(36f, 36f, width - 36f, height - 36f)
-            canvas.drawRoundRect(rect, 40f, 40f, borderPaint)
-
-            val cardPaint = Paint().apply {
-                color = android.graphics.Color.parseColor(cardColorHex)
-                style = Paint.Style.FILL
-                isAntiAlias = true
-            }
-            val innerRect = RectF(80f, 300f, width - 80f, height - 300f)
-            canvas.drawRoundRect(innerRect, 32f, 32f, cardPaint)
-            
-            val brandPaint = Paint().apply {
-                color = android.graphics.Color.parseColor(primaryColorHex)
-                textSize = 56f
-                textAlign = Paint.Align.CENTER
-                isAntiAlias = true
-                isFakeBoldText = true
-            }
-            canvas.drawText("قَبَس | QABAS AI STUDIO", width / 2f, 220f, brandPaint)
-            
-            val textPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#F8FAFC")
-                textSize = 44f
-                textAlign = Paint.Align.CENTER
-                isAntiAlias = true
-            }
-            
-            val cleanText = text.trim()
-            val displayLines = cleanText.chunked(32)
-            var startY = (height / 2f) - ((displayLines.size * 60f) / 2f)
-            for (line in displayLines.take(6)) {
-                canvas.drawText(line, width / 2f, startY, textPaint)
-                startY += 65f
-            }
-            
-            val footerPaint = Paint().apply {
-                color = android.graphics.Color.parseColor("#94A3B8")
-                textSize = 34f
-                textAlign = Paint.Align.CENTER
-                isAntiAlias = true
-            }
-            canvas.drawText("محتوى دعوي هادف موثوق ✦", width / 2f, height - 180f, footerPaint)
-            
             val file = File(appContext.cacheDir, "solid_fallback_${System.currentTimeMillis()}_${(1000..9999).random()}.png")
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.PNG, 95, out)
-            }
-            file
+            val ok = ProceduralBackdropEngine.render(
+                filePath = file.absolutePath,
+                width = 1080,
+                height = 1920,
+                topHex = cardColorHex,
+                bottomHex = bgColorHex,
+                accentHex = primaryColorHex,
+                caption = text.trim(),
+                brandLine = "قَبَس | QABAS AI STUDIO",
+                footerText = "محتوى دعوي هادف موثوق ✦"
+            )
+            if (ok && file.exists() && file.length() > 0L) file else null
         } catch (e: Exception) {
             Log.e("AppServices", "Error creating solid fallback image", e)
             null
-        } finally {
-            bitmap?.recycle()
         }
     }
 

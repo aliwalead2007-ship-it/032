@@ -583,121 +583,59 @@ class VideoEngineManager(private val context: Context) {
         val out = File(cacheDir, "solid_color_$index.mp4")
         try {
             val imgFile = File(cacheDir, "solid_color_img_$index.png")
-            var bitmap: android.graphics.Bitmap? = null
-            try {
-                val w = 1080
-                val h = 1920
-                bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
-                val canvas = android.graphics.Canvas(bitmap)
+            val colorsRaw = styleAnalysis?.dominantColors ?: ""
+            val keywordsBlob = styleAnalysis?.keywords?.joinToString(" ") ?: ""
+            val parseBlob = (colorsRaw + " " + keywordsBlob).lowercase(Locale.ROOT)
 
-                val colorsRaw = styleAnalysis?.dominantColors ?: ""
-                val keywordsBlob = styleAnalysis?.keywords?.joinToString(" ") ?: ""
-                val parseBlob = (colorsRaw + " " + keywordsBlob).lowercase(Locale.ROOT)
-                
-                val patternHex = Regex("""(?i)(?:primary|color)\s*[=:]\s*#?([0-9A-Fa-f]{6})""")
-                val directivePrimary = patternHex.find(colorsRaw + " " + keywordsBlob)?.groupValues?.getOrNull(1)?.let { "#${it.uppercase(Locale.ROOT)}" }
-                val patternBg = Regex("""(?i)(?:bg|background)\s*[=:]\s*#?([0-9A-Fa-f]{6})""")
-                val directiveBg = patternBg.find(colorsRaw + " " + keywordsBlob)?.groupValues?.getOrNull(1)?.let { "#${it.uppercase(Locale.ROOT)}" }
+            val patternHex = Regex("""(?i)(?:primary|color)\s*[=:]\s*#?([0-9A-Fa-f]{6})""")
+            val directivePrimary = patternHex.find(colorsRaw + " " + keywordsBlob)?.groupValues?.getOrNull(1)?.let { "#${it.uppercase(Locale.ROOT)}" }
+            val patternBg = Regex("""(?i)(?:bg|background)\s*[=:]\s*#?([0-9A-Fa-f]{6})""")
+            val directiveBg = patternBg.find(colorsRaw + " " + keywordsBlob)?.groupValues?.getOrNull(1)?.let { "#${it.uppercase(Locale.ROOT)}" }
 
-                val (bgTop, bgBottom, accent) = when {
-                    directivePrimary != null && directiveBg != null -> {
-                        val top = directiveBg
-                        val bottom = try {
-                            val c = android.graphics.Color.parseColor(directiveBg)
-                            val r = (android.graphics.Color.red(c) * 0.7f).toInt().coerceIn(0, 255)
-                            val g = (android.graphics.Color.green(c) * 0.7f).toInt().coerceIn(0, 255)
-                            val b = (android.graphics.Color.blue(c) * 0.7f).toInt().coerceIn(0, 255)
-                            String.format(Locale.ROOT, "#%02X%02X%02X", r, g, b)
-                        } catch (_: Exception) {
-                            directiveBg
-                        }
-                        Triple(top, bottom, directivePrimary)
+            val (bgTop, bgBottom, accent) = when {
+                directivePrimary != null && directiveBg != null -> {
+                    val top = directiveBg
+                    val bottom = try {
+                        val c = android.graphics.Color.parseColor(directiveBg)
+                        val r = (android.graphics.Color.red(c) * 0.7f).toInt().coerceIn(0, 255)
+                        val g = (android.graphics.Color.green(c) * 0.7f).toInt().coerceIn(0, 255)
+                        val b = (android.graphics.Color.blue(c) * 0.7f).toInt().coerceIn(0, 255)
+                        String.format(Locale.ROOT, "#%02X%02X%02X", r, g, b)
+                    } catch (_: Exception) {
+                        directiveBg
                     }
-                    parseBlob.contains("cool_emerald") || parseBlob.contains("أخضر") || parseBlob.contains("emerald") ->
-                        Triple("#0A1F18", "#0F291E", "#10B981")
-                    parseBlob.contains("أزرق") || parseBlob.contains("blue") ->
-                        Triple("#06101F", "#0A192F", "#38BDF8")
-                    parseBlob.contains("soft_desert") || parseBlob.contains("برتقالي") || parseBlob.contains("غروب") ->
-                        Triple("#1A0C04", "#1E1005", "#F97316")
-                    parseBlob.contains("نيون") || parseBlob.contains("أصفر") ->
-                        Triple("#0B0F19", "#12181F", "#FFE500")
-                    parseBlob.contains("high_contrast") ->
-                        Triple("#050811", "#0B0F19", "#EF4444")
-                    else ->
-                        Triple("#070B14", "#0B0F19", directivePrimary ?: "#E8C547")
+                    Triple(top, bottom, directivePrimary)
                 }
-
-                val gradient = android.graphics.LinearGradient(
-                    0f, 0f, 0f, h.toFloat(),
-                    android.graphics.Color.parseColor(bgTop),
-                    android.graphics.Color.parseColor(bgBottom),
-                    android.graphics.Shader.TileMode.CLAMP
-                )
-                canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), android.graphics.Paint().apply { shader = gradient })
-
-                val glowPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    shader = android.graphics.RadialGradient(
-                        w / 2f, h / 2f, w * 0.45f,
-                        android.graphics.Color.parseColor("#33" + accent.removePrefix("#")),
-                        android.graphics.Color.TRANSPARENT,
-                        android.graphics.Shader.TileMode.CLAMP
-                    )
-                }
-                canvas.drawCircle(w / 2f, h / 2f, w * 0.45f, glowPaint)
-
-                val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    color = android.graphics.Color.parseColor(accent)
-                    strokeWidth = 3f
-                    style = android.graphics.Paint.Style.STROKE
-                    alpha = 180
-                }
-                canvas.drawLine(w * 0.25f, h * 0.42f, w * 0.75f, h * 0.42f, linePaint)
-
-                val brandPaint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    color = android.graphics.Color.parseColor(accent)
-                    textSize = 42f
-                    typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-                canvas.drawText("قبس  |  Qabas", w / 2f, h * 0.38f, brandPaint)
-
-                val title = sceneTitle?.trim()?.take(60).orEmpty()
-                if (title.isNotBlank()) {
-                    val titlePaint = android.text.TextPaint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.parseColor("#F1F5F9")
-                        textSize = 34f
-                        typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
-                    }
-                    @Suppress("DEPRECATION")
-                    val layout = android.text.StaticLayout(
-                        title,
-                        titlePaint,
-                        (w * 0.75f).toInt(),
-                        android.text.Layout.Alignment.ALIGN_CENTER,
-                        1.2f,
-                        0f,
-                        true
-                    )
-                    canvas.save()
-                    canvas.translate((w - layout.width) / 2f, h * 0.46f)
-                    layout.draw(canvas)
-                    canvas.restore()
-                }
-
-                val subPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                    color = android.graphics.Color.parseColor("#80E8C547")
-                    textSize = 22f
-                    textAlign = android.graphics.Paint.Align.CENTER
-                }
-                canvas.drawText("Offline Cinematic Frame", w / 2f, h * 0.88f, subPaint)
-
-                FileOutputStream(imgFile).use { fos ->
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 95, fos)
-                }
-            } finally {
-                bitmap?.recycle()
+                parseBlob.contains("cool_emerald") || parseBlob.contains("أخضر") || parseBlob.contains("emerald") ->
+                    Triple("#0A1F18", "#0F291E", "#10B981")
+                parseBlob.contains("أزرق") || parseBlob.contains("blue") ->
+                    Triple("#06101F", "#0A192F", "#38BDF8")
+                parseBlob.contains("soft_desert") || parseBlob.contains("برتقالي") || parseBlob.contains("غروب") ->
+                    Triple("#1A0C04", "#1E1005", "#F97316")
+                parseBlob.contains("نيون") || parseBlob.contains("أصفر") ->
+                    Triple("#0B0F19", "#12181F", "#FFE500")
+                parseBlob.contains("high_contrast") ->
+                    Triple("#050811", "#0B0F19", "#EF4444")
+                else ->
+                    Triple("#070B14", "#0B0F19", directivePrimary ?: "#E8C547")
             }
 
+            try {
+                val ok = ProceduralBackdropEngine.render(
+                    filePath = imgFile.absolutePath,
+                    width = 1080,
+                    height = 1920,
+                    topHex = bgTop,
+                    bottomHex = bgBottom,
+                    accentHex = accent,
+                    caption = sceneTitle?.trim()?.take(60)?.takeIf { it.isNotBlank() }
+                )
+                if (!ok || !imgFile.exists() || imgFile.length() == 0L) {
+                    Log.e(TAG, "generateSolidColorVideo produced invalid backdrop image for scene $index")
+                }
+            } catch (t: Throwable) {
+                Log.e(TAG, "Error generating procedural backdrop for scene $index", t)
+            }
             val ok = VideoProcessor.generateVideoFromImage(
                 context,
                 imgFile.absolutePath,
