@@ -377,6 +377,12 @@
 - **توثيق الطبقات المجانية (`.env.example`):** إضافة روابط ومفاتيح كل خدمة (Gemini، Azure، ElevenLabs، Groq، Pexels، Pixabay، Supabase) مع شرح أن التطبيق يعمل بلا مفاتيح (محلل محلي + TTS مدمج). ملاحظة: يجب إبقاء قيم placeholder غير فارغة حتى لا ينكسر `BuildConfig.java`.
 - **CI أخضر:** تشغيل كامل ناجح (Compile Kotlin → Assemble Debug APK → Upload APK).
 
+### 65. إكمال خيارات المفاتيح المجانية في شاشة المفاتيح (Free-Tier Keys UI · Azure · ElevenLabs · Zero-Key)
+- **بطاقتا Azure Speech و ElevenLabs:** إنشاء حقول في `ApiKeysScreen` لمفتاحَي TTS اللذين كانا يُقرآن فعلياً في `generateVoiceover` لكنهما غائبان عن الواجهة — مع حقل **المنطقة (Region)** لـ Azure، ودليل خطوة-بخطوة لكل مفتاح ورابط مباشر (Azure Speech Free F0 مجاناً للأبد، ElevenLabs Free مع حصة شهرية).
+- **فحص اتصال حقيقي في `ApiKeyValidator`:** تحقق فعلي من Azure (`sts/v1.0/issuetoken` عبر `Ocp-Apim-Subscription-Key` + المنطقة) وElevenLabs (`/v1/user/subscription` عبر `xi-api-key`) مع رسائل نجاح/خطأ موضحة بالعربية.
+- **تصدير/استيراد النسخ الاحتياطي:** إدراج `azure_speech_key` و`azure_speech_region` و`elevenlabs_key` في JSON النسخ الاحتياطي وقراءتها عند الاستيراد (مع إصلاح تمييز المفتاح عن المنطقة).
+- **بطاقة افتتاحية «يعمل مجاناً دون أي مفتاح 🎉»:** توضيح أن التحليل المحلي + محرك النطق المدمج + FFmpeg تعمل بلا مفاتيح وبدون إنترنت، وأن بقية المفاتيح اختيارية لطبقة مجانية أذكى وأجمل — يبسّط إعداد التطبيق للمستخدم بلا مال.
+
 ---
 - **البناء:** نجح بناء التطبيق بالكامل بعد إصلاح تضارب الأسماء وتكرار الدوال في `DeveloperDashboardScreen.kt`. حزمة `Qabas-Studio-Debug-APK` جاهزة للبناء عبر GitHub Actions وGoogle AI Studio.
 - **إعداد ملفات البيئة (`.env` / `.env.example`):** قيم افتراضية آمنة لمنع أخطاء توليد `BuildConfig`.
