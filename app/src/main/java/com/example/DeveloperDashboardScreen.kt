@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import com.example.ui.theme.*
 
 import androidx.compose.ui.graphics.Brush
@@ -47,6 +48,46 @@ data class DevUser(
     val regDate: String,
     val isSuspended: Boolean = false
 )
+
+/** أدوات تنسيق البيانات الحقيقية لشاشة المطور. */
+object DevDashboardFormatters {
+    private val dateFormat = java.text.SimpleDateFormat("yyyy/MM/dd", java.util.Locale.getDefault())
+
+    /**
+     * ينسّق تاريخ التسجيل من حقل `createdAt` الموجود في Firestore (epoch millis)
+     * أو Supabase (نص ISO). يعود بنص "غير معروف" عند غياب القيمة.
+     */
+    fun formatRegDate(createdAt: Any?): String {
+        val mills = when (createdAt) {
+            is Number -> createdAt.toLong()
+            is String -> parseCreatedAtString(createdAt)
+            else -> 0L
+        }
+        if (mills <= 0L) return "غير معروف"
+        return runCatching { dateFormat.format(java.util.Date(mills)) }.getOrDefault("غير معروف")
+    }
+
+    /** يجرّب نصوص ISO للتواريخ مع خيار المللي، ثم الرقم الخام (epoch millis). */
+    private fun parseCreatedAtString(raw: String): Long {
+        val isoFormats = listOf(
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS", java.util.Locale.US),
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.US),
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+        )
+        for (fmt in isoFormats) {
+            val parsed = runCatching { fmt.parse(raw)?.time }.getOrNull()
+            if (parsed != null && parsed > 0L) return parsed
+        }
+        return runCatching { raw.toLong() }.getOrDefault(0L)
+    }
+
+    /** تنسيق زمن الاستجابة الحقيقي بالثواني أو المللي ثانية. */
+    fun formatLatency(ms: Long): String = when {
+        ms >= 1000 -> String.format(java.util.Locale.getDefault(), "%.1fs", ms / 1000.0)
+        ms > 0 -> "${ms}ms"
+        else -> "--"
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -139,30 +180,57 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
         val context = LocalContext.current
         var requests by remember { mutableStateOf(AppRequestService.getRequests(context, isDeveloper = true)) }
 
-        // Clean user list starting strictly with official developer accounts (no fake users)
-        val devUsers = remember {
-            mutableStateListOf(
-                DevUser("1", "علي وليد (المطور الرئيسي)", "aliwalead.2007@gmail.com", "مطور", 0, "نشط الآن"),
-                DevUser("2", "حساب الإدارة", "aly750834@gmail.com", "مطور", 0, "نشط الآن")
-            )
-        }
+        // قائمة المستخدمين الحقيقية فقط — بلا أي حسابات مزيفة أو مدمجة في الكود
+        val devUsers = remember { mutableStateListOf<DevUser>() }
 
         LaunchedEffect(Unit) {
+            val seenIds = mutableSetOf<String>()
+            val seenEmails = mutableSetOf<String>()
+
+            fun addUser(user: DevUser) {
+                if (seenIds.add(user.id) && user.email !in seenEmails) {
+                    seenEmails.add(user.email)
+                    devUsers.add(user)
+                }
+            }
+
             if (CloudServices.isFirebaseInitialized) {
                 val usersFromCloud = CloudServices.Database.getAllUsers()
-                val newDevUsers = usersFromCloud.map { userMap ->
+                val usersWithProjects = usersFromCloud.map { userMap ->
+                    val uid = userMap["id"] as? String ?: ""
+                    val projectCount = if (uid.isNotBlank()) {
+                        kotlin.runCatching {
+                            CloudServices.Database.getDevUserProjectCount(uid)
+                        }.getOrDefault(0)
+                    } else 0
                     DevUser(
-                        id = userMap["id"] as? String ?: "",
+                        id = uid,
                         name = userMap["name"] as? String ?: "بدون اسم",
                         email = userMap["email"] as? String ?: "",
-                        type = userMap["type"] as? String ?: "مجاني",
-                        projectCount = 0,
-                        regDate = userMap["status"] as? String ?: "نشط الآن",
+                        type = (userMap["type"] as? String ?: "مجاني"),
+                        projectCount = projectCount,
+                        regDate = DevDashboardFormatters.formatRegDate(userMap["createdAt"]),
                         isSuspended = (userMap["strikes"] as? Long ?: 0L) >= 5L
                     )
                 }
-                val existingEmails = devUsers.map { it.email }.toSet()
-                devUsers.addAll(newDevUsers.filter { it.email !in existingEmails })
+                usersWithProjects.forEach { addUser(it) }
+            }
+
+            if (SupabaseServices.isSupabaseAvailable) {
+                val supabaseUsers = SupabaseServices.Database.getAllUsers()
+                supabaseUsers.forEach { row ->
+                    addUser(
+                        DevUser(
+                            id = row.externalId ?: row.id,
+                            name = row.name ?: row.email ?: "بدون اسم",
+                            email = row.email ?: row.externalId ?: "",
+                            type = if (row.type == "developer") "مطور" else "مجاني",
+                            projectCount = 0,
+                            regDate = DevDashboardFormatters.formatRegDate(row.createdAt),
+                            isSuspended = row.strikes >= 5
+                        )
+                    )
+                }
             }
         }
 
@@ -1122,23 +1190,26 @@ fun LiveFirebaseAnalyticsMonitorCard(context: Context) {
             Text("أكثر الشاشات والاستوديوهات زيارة وتفاعلاً:", color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
 
+            // لا توجد بيانات زيارة حقيقية لكل شاشة حتى الآن — أرقام صادقة بدلاً من قيم مختلقة
             val screensStats = listOf(
-                Triple("استوديو الريلز (Reels)", 84, Color(0xFFEAB308)),
-                Triple("المُلقن الذكي (Teleprompter)", 67, Color(0xFF3B82F6)),
-                Triple("استوديو بطاقات الأحاديث", 52, Color(0xFF10B981)),
-                Triple("محرك السلاسل الدعوية الآلي", 43, Color(0xFFA855F7)),
-                Triple("المساعد الدعوي الذكي", 39, Color(0xFFEC4899))
+                Pair("استوديو الريلز (Reels)", Color(0xFFEAB308)),
+                Pair("المُلقن الذكي (Teleprompter)", Color(0xFF3B82F6)),
+                Pair("استوديو بطاقات الأحاديث", Color(0xFF10B981)),
+                Pair("محرك السلاسل الدعوية الآلي", Color(0xFFA855F7)),
+                Pair("المساعد الدعوي الذكي", Color(0xFFEC4899))
             )
 
+            Text("لا تتوفر بيانات زيارة لكل شاشة بعد — سيتم ربطها بالتتبع الفعلي لاحقاً.", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 11.sp)
+
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                screensStats.forEach { (screenName, count, barColor) ->
+                screensStats.forEach { (screenName, barColor) ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(screenName, color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp, modifier = Modifier.weight(1.5f))
                         LinearProgressIndicator(
-                            progress = { count / 100f },
+                            progress = { 0f },
                             modifier = Modifier
                                 .weight(2f)
                                 .height(6.dp)
@@ -1147,7 +1218,7 @@ fun LiveFirebaseAnalyticsMonitorCard(context: Context) {
                             trackColor = Color(0xFF0B0F19)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("$count زيارة", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 12.sp, modifier = Modifier.width(55.dp))
+                        Text("--", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 12.sp, modifier = Modifier.width(55.dp))
                     }
                 }
             }
@@ -1356,16 +1427,47 @@ fun WeeklyEngagementTrendsChart(context: Context) {
     var selectedMetric by remember { mutableIntStateOf(0) } // 0: إنتاج الفيديو, 1: نصوص الذكاء الاصطناعي, 2: بطاقات الأحاديث
 
     val daysOfWeek = listOf("السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة")
-    val videoData = listOf(14, 22, 19, 31, 28, 45, 54)
-    val scriptData = listOf(35, 48, 52, 60, 58, 85, 92)
-    val cardsData = listOf(20, 25, 30, 42, 38, 50, 68)
+
+    // عدّ حقيقي من قاعدة البيانات أثناء الافتتاح — لا أرقام مزيفة
+    var videoData by remember { mutableStateOf(IntArray(7)) }
+    var scriptData by remember { mutableStateOf(IntArray(7)) }
+    var cardsData by remember { mutableStateOf(IntArray(7)) }
+
+    LaunchedEffect(Unit) {
+        val db = AppDatabase.getDatabase(context)
+        val today = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, 0)
+            set(java.util.Calendar.MINUTE, 0)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+        }
+        val dayStarts = LongArray(7)
+        val dayEnds = LongArray(7)
+        for (i in 6 downTo 0) {
+            val startCal = today.clone() as java.util.Calendar
+            startCal.add(java.util.Calendar.DAY_OF_YEAR, -i)
+            dayStarts[6 - i] = startCal.timeInMillis
+            dayEnds[6 - i] = startCal.timeInMillis + 86_400_000L
+        }
+        val v = IntArray(7)
+        val s = IntArray(7)
+        val c = IntArray(7)
+        for (i in 0..6) {
+            v[i] = db.projectDao().countProjectsBetween(dayStarts[i], dayEnds[i])
+            s[i] = db.reelScriptDao().countScriptsBetween(dayStarts[i], dayEnds[i])
+            c[i] = db.hadithCardDao().countCardsBetween(dayStarts[i], dayEnds[i])
+        }
+        videoData = v
+        scriptData = s
+        cardsData = c
+    }
 
     val currentData = when (selectedMetric) {
         0 -> videoData
         1 -> scriptData
         else -> cardsData
     }
-    val maxVal = currentData.maxOrNull()?.toFloat() ?: 100f
+    val maxVal = (currentData.maxOrNull() ?: 0).coerceAtLeast(1).toFloat()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1489,6 +1591,23 @@ fun WeeklyEngagementTrendsChart(context: Context) {
 @Composable
 fun SystemPerformanceHealthKpiGrid(context: Context) {
     val db = remember { AppDatabase.getDatabase(context) }
+    var stats by remember { mutableStateOf<Map<String, ApiUsageTracker.ApiStat>>(emptyMap()) }
+    LaunchedEffect(Unit) {
+        stats = ApiUsageTracker.snapshot(context)
+    }
+
+    val totalCalls = stats.values.sumOf { it.totalCalls }
+    val totalSuccess = stats.values.sumOf { it.successCalls }
+    val overallSuccessRate = if (totalCalls > 0) (totalSuccess * 100) / totalCalls else 0
+    val hasMeasurements = totalCalls > 0
+
+    val usedMemoryMb = remember {
+        val rt = Runtime.getRuntime()
+        (rt.totalMemory() - rt.freeMemory()) / (1024L * 1024L)
+    }
+    val roomVersion = remember {
+        runCatching { db.openHelper.writableDatabase.version }.getOrDefault(4)
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -1505,30 +1624,69 @@ fun SystemPerformanceHealthKpiGrid(context: Context) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Speed, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("مؤشرات زمن الاستجابة والاستقرار", color = Color.White, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Text("مؤشرات زمن الاستجابة والاستقرار الحقيقية", color = Color.White, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
                 Surface(
-                    color = Color(0xFF10B981).copy(alpha = 0.15f),
+                    color = if (hasMeasurements) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFF475569).copy(alpha = 0.2f),
                     shape = RoundedCornerShape(4.dp)
                 ) {
-                    Text("مستقر 100% ⚡", color = Color(0xFF10B981), fontSize = 12.sp, fontFamily = NotoSansFont, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                    Text(
+                        if (hasMeasurements) "مستقر $overallSuccessRate% ⚡" else "لا قياسات بعد",
+                        color = if (hasMeasurements) Color(0xFF10B981) else Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        fontFamily = NotoSansFont,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KpiMetricBox(title = "Gemini 1.5 Flash", value = "1.1s", subtitle = "متوسط التوليد", modifier = Modifier.weight(1f))
-                KpiMetricBox(title = "Groq Fast LLM", value = "380ms", subtitle = "فائق السرعة", modifier = Modifier.weight(1f))
-                KpiMetricBox(title = "ElevenLabs TTS", value = "1.6s", subtitle = "الصوت الذكي", modifier = Modifier.weight(1f))
+                KpiMetricBox(
+                    title = "Gemini",
+                    value = DevDashboardFormatters.formatLatency(stats["Gemini"]?.avgLatencyMs ?: 0L),
+                    subtitle = "متوسط زمن التوليد",
+                    modifier = Modifier.weight(1f)
+                )
+                KpiMetricBox(
+                    title = "Groq",
+                    value = DevDashboardFormatters.formatLatency(stats["Groq"]?.avgLatencyMs ?: 0L),
+                    subtitle = "متوسط زمن الاستدعاء",
+                    modifier = Modifier.weight(1f)
+                )
+                KpiMetricBox(
+                    title = "ElevenLabs",
+                    value = DevDashboardFormatters.formatLatency(stats["ElevenLabs"]?.avgLatencyMs ?: 0L),
+                    subtitle = "متوسط زمن الصوت",
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                KpiMetricBox(title = "معدل الانهيار (Crash)", value = "0.0%", subtitle = "صفر أخطاء", isPositive = true, modifier = Modifier.weight(1f))
-                KpiMetricBox(title = "قاعدة بيانات Room", value = "v4 نشطة", subtitle = "تخزين محلي مؤمن", isPositive = true, modifier = Modifier.weight(1f))
-                KpiMetricBox(title = "استهلاك الذاكرة", value = "~48 MB", subtitle = "أداء خفيف جداً", isPositive = true, modifier = Modifier.weight(1f))
+                KpiMetricBox(
+                    title = "نسبة نجاح الاستدعاءات",
+                    value = if (hasMeasurements) "$overallSuccessRate%" else "--",
+                    subtitle = "$totalCalls استدعاء مسجّل",
+                    isPositive = true,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiMetricBox(
+                    title = "قاعدة بيانات Room",
+                    value = "v$roomVersion",
+                    subtitle = "الإصدار الفعلي على الجهاز",
+                    isPositive = true,
+                    modifier = Modifier.weight(1f)
+                )
+                KpiMetricBox(
+                    title = "استهلاك الذاكرة",
+                    value = "$usedMemoryMb MB",
+                    subtitle = "الذاكرة المخصصة الفعلية",
+                    isPositive = true,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -1698,29 +1856,14 @@ fun FirebaseStorageCapacityCard(context: Context) {
 
 @Composable
 fun ApiConsumptionChart(context: Context) {
-    val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
+    var stats by remember { mutableStateOf<Map<String, ApiUsageTracker.ApiStat>>(emptyMap()) }
+    LaunchedEffect(Unit) {
+        stats = ApiUsageTracker.snapshot(context)
+    }
 
-    val geminiKey = prefs.getString("gemini_key", "") ?: ""
-    val azureSpeechKey = prefs.getString("azure_speech_key", "") ?: ""
-    val elevenlabsKey = prefs.getString("elevenlabs_key", "") ?: ""
-    val pexelsKey = prefs.getString("pexels_key", "") ?: ""
-    val pixabayKey = prefs.getString("pixabay_key", "") ?: ""
-    val groqKey = prefs.getString("groq_key", "") ?: ""
-    val huggingfaceKey = prefs.getString("huggingface_key", "") ?: ""
-    val firebaseKey = prefs.getString("firebase_key", "") ?: ""
-
-    val apis = listOf(
-        "Gemini" to (if (geminiKey.isNotBlank()) 0.25f else 0.05f),
-        "Azure TTS" to (if (azureSpeechKey.isNotBlank()) 0.35f else 0.05f),
-        "ElevenLabs" to (if (elevenlabsKey.isNotBlank()) 0.30f else 0.05f),
-        "Groq" to (if (groqKey.isNotBlank()) 0.20f else 0.05f),
-        "HF AI" to (if (huggingfaceKey.isNotBlank()) 0.15f else 0.05f),
-        "Pexels" to (if (pexelsKey.isNotBlank()) 0.40f else 0.05f),
-        "Pixabay" to (if (pixabayKey.isNotBlank()) 0.30f else 0.05f),
-        "Firebase" to (if (firebaseKey.isNotBlank()) 0.50f else 0.05f)
-    )
-
-    val activeCount = apis.count { it.second > 0.1f }
+    val apis = ApiUsageTracker.SUPPORTED
+    val totalCalls = stats.values.sumOf { it.totalCalls }
+    val maxCalls = stats.values.maxOfOrNull { it.totalCalls } ?: 0
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -1740,13 +1883,13 @@ fun ApiConsumptionChart(context: Context) {
                     Text("استهلاك مفاتيح API الحقيقي", color = Color.White, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
                 Surface(
-                    color = if (activeCount > 0) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFFEF4444).copy(alpha = 0.2f),
+                    color = if (totalCalls > 0) Color(0xFF10B981).copy(alpha = 0.2f) else Color(0xFF475569).copy(alpha = 0.2f),
                     shape = RoundedCornerShape(4.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (activeCount > 0) Color(0xFF10B981) else Color(0xFFEF4444))
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (totalCalls > 0) Color(0xFF10B981) else Color(0xFF64748B))
                 ) {
                     Text(
-                        "$activeCount / 7 مفتاح نشط",
-                        color = if (activeCount > 0) Color(0xFF10B981) else Color(0xFFEF4444),
+                        if (totalCalls > 0) "$totalCalls استدعاء مسجّل" else "لا قياسات بعد",
+                        color = if (totalCalls > 0) Color(0xFF10B981) else Color(0xFF94A3B8),
                         fontSize = 10.sp,
                         fontFamily = CairoFont,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -1754,7 +1897,7 @@ fun ApiConsumptionChart(context: Context) {
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text("معدل جاهزية واستخدام المفاتيح الحقيقية المسجلة بالتطبيق.", color = TextSecondary, fontFamily = NotoSansFont, fontSize = 12.sp)
+            Text("أعداد الاستدعاءات الفعلية المسجّلة من نقاط HTTP الحقيقية في التطبيق.", color = TextSecondary, fontFamily = NotoSansFont, fontSize = 12.sp)
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -1776,10 +1919,11 @@ fun ApiConsumptionChart(context: Context) {
                         )
                     }
 
-                    apis.forEachIndexed { index, pair ->
-                        val (name, usage) = pair
+                    apis.forEachIndexed { index, name ->
+                        val calls = stats[name]?.totalCalls ?: 0L
+                        val fraction = if (maxCalls > 0) calls.toFloat() / maxCalls else 0f
                         val x = (index * 2 * barWidth) + barWidth / 2
-                        val targetHeight = maxBarHeight * usage
+                        val targetHeight = maxBarHeight * fraction
                         val yOffset = maxBarHeight - targetHeight
 
                         drawRoundRect(
@@ -1788,7 +1932,7 @@ fun ApiConsumptionChart(context: Context) {
                             size = androidx.compose.ui.geometry.Size(barWidth, maxBarHeight),
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(8.dp.toPx())
                         )
-                        val barColor = if (usage > 0.1f) Color(0xFF10B981) else Color(0xFFEF4444)
+                        val barColor = if (calls > 0) Color(0xFF10B981) else Color(0xFF334155)
                         drawRoundRect(
                             brush = Brush.verticalGradient(listOf(barColor.copy(alpha = 0.8f), barColor.copy(alpha = 0.3f))),
                             topLeft = androidx.compose.ui.geometry.Offset(x, yOffset),
@@ -1801,13 +1945,13 @@ fun ApiConsumptionChart(context: Context) {
 
             Spacer(modifier = Modifier.height(8.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                apis.forEach { (name, usage) ->
+                apis.forEach { name ->
+                    val calls = stats[name]?.totalCalls ?: 0L
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                        Text(name, color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        val isConfigured = usage > 0.1f
+                        Text(name.replace("HuggingFace", "HF AI"), color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text(
-                            if (isConfigured) "مفعل" else "معطل",
-                            color = if (isConfigured) Color(0xFF10B981) else Color(0xFFEF4444),
+                            if (calls > 0) "$calls استدعاء" else "0",
+                            color = if (calls > 0) Color(0xFF10B981) else Color(0xFF64748B),
                             fontFamily = CairoFont,
                             fontSize = 9.sp
                         )
@@ -2187,7 +2331,13 @@ fun ActiveCodeItem(code: String, type: String, icon: ImageVector) {
 @Composable
 fun RevenueSection(context: Context) {
     val purchases by CloudServices.Database.observeAllTransactions().collectAsState(initial = emptyList())
-    val isLoading = false
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        // ننتظر أول لقطة حقيقية من Firestore ثم نوقف حالة التحميل
+        CloudServices.Database.observeAllTransactions().first()
+        isLoading = false
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Card(

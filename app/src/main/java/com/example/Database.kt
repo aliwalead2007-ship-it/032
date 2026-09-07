@@ -115,6 +115,9 @@ interface ProjectDao {
 
     @Query("DELETE FROM projects")
     suspend fun clearAllProjects()
+
+    @Query("SELECT COUNT(*) FROM projects WHERE createdAt >= :start AND createdAt < :end")
+    suspend fun countProjectsBetween(start: Long, end: Long): Int
 }
 
 @Dao
@@ -157,6 +160,9 @@ interface HadithCardDao {
 
     @Query("DELETE FROM hadith_cards WHERE id = :id")
     suspend fun deleteCardById(id: String)
+
+    @Query("SELECT COUNT(*) FROM hadith_cards WHERE createdAt >= :start AND createdAt < :end")
+    suspend fun countCardsBetween(start: Long, end: Long): Int
 }
 
 @Dao
@@ -190,6 +196,9 @@ interface ReelScriptDao {
 
     @Query("DELETE FROM reel_scripts WHERE id = :id")
     suspend fun deleteScriptById(id: String)
+
+    @Query("SELECT COUNT(*) FROM reel_scripts WHERE createdAt >= :start AND createdAt < :end")
+    suspend fun countScriptsBetween(start: Long, end: Long): Int
 }
 
 @Dao

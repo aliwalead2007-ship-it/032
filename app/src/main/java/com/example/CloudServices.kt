@@ -215,6 +215,22 @@ object CloudServices {
             }
         }
 
+        /**
+         * عدد مشاريع المستخدم الحقيقي من المجموعة الفرعية `users/{uid}/projects`.
+         * يُستخدم في لوحة المطور لعرض أرقام حقيقية بدلاً من القيم المزيفة.
+         */
+        suspend fun getDevUserProjectCount(uid: String): Int {
+            if (!isFirebaseInitialized || uid.isBlank()) return 0
+            return try {
+                val snapshot = db.collection("users").document(uid)
+                    .collection("projects").get().await()
+                snapshot.size()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error counting projects for $uid: ${e.message}")
+                0
+            }
+        }
+
         // حفظ مشروع في السحابة
         suspend fun saveProjectToCloud(project: Project) {
             if (!isFirebaseInitialized) {

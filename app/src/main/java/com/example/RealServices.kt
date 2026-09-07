@@ -86,7 +86,7 @@ object RealGeminiService {
                 .post(requestBody)
                 .build()
                 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Gemini") { client.newCall(request).execute() }
             if (response.isSuccessful) {
                 val responseData = response.body?.string() ?: ""
                 val responseJson = JSONObject(responseData)
@@ -190,7 +190,7 @@ object RealGeminiService {
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Gemini") { client.newCall(request).execute() }
             val responseBodyString = response.body?.string() ?: ""
             if (response.isSuccessful) {
                 val jsonResponse = JSONObject(responseBodyString)
@@ -258,7 +258,7 @@ object RealGeminiService {
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Gemini") { client.newCall(request).execute() }
             val responseBodyString = response.body?.string() ?: ""
             
             if (response.isSuccessful) {
@@ -373,7 +373,7 @@ object RealGeminiService {
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Gemini") { client.newCall(request).execute() }
             if (response.isSuccessful) {
                 val responseBody = response.body?.string() ?: ""
                 val responseJson = JSONObject(responseBody)
@@ -638,7 +638,7 @@ object RealGeminiService {
                 .post(requestBody)
                 .build()
                 
-            val response = client.newCall(httpRequest).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Gemini") { client.newCall(httpRequest).execute() }
             if (!response.isSuccessful) {
                 return@safeApiCall "فشل توليد التوجيهات"
             }
@@ -713,7 +713,7 @@ object RealMediaLibraryService {
                         .url(url)
                         .addHeader("Authorization", pexelsKey)
                         .build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(AppServices.appContext, "Pexels") { client.newCall(request).execute() }
                     if (response.isSuccessful) {
                         val responseJson = JSONObject(response.body?.string() ?: "")
                         if (type == "video") {
@@ -753,7 +753,7 @@ object RealMediaLibraryService {
                     val encodedQ = java.net.URLEncoder.encode(searchQ, "UTF-8")
                     val url = if (type == "video") "https://pixabay.com/api/videos/?key=$pixabayKey&q=$encodedQ&video_type=all" else "https://pixabay.com/api/?key=$pixabayKey&q=$encodedQ&image_type=photo"
                     val request = Request.Builder().url(url).build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(AppServices.appContext, "Pixabay") { client.newCall(request).execute() }
                     if (response.isSuccessful) {
                         val responseJson = JSONObject(response.body?.string() ?: "")
                         val hits = responseJson.optJSONArray("hits")
@@ -834,7 +834,7 @@ object RealMediaLibraryService {
                 .post(requestBody)
                 .build()
                 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Gemini") { client.newCall(request).execute() }
             if (response.isSuccessful) {
                 val responseData = response.body?.string() ?: ""
                 val responseJson = org.json.JSONObject(responseData)
@@ -886,7 +886,7 @@ object RealGroqService {
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Groq") { client.newCall(request).execute() }
             if (response.isSuccessful) {
                 val resObj = JSONObject(response.body?.string() ?: "")
                 val choices = resObj.optJSONArray("choices")
@@ -921,7 +921,7 @@ object RealHuggingFaceService {
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "HuggingFace") { client.newCall(request).execute() }
             if (response.isSuccessful) {
                 val imageBytes = response.body?.bytes()
                 if (imageBytes != null && imageBytes.isNotEmpty()) {
@@ -988,7 +988,7 @@ object RealAzureSpeechService {
                 .post(ssml.toRequestBody("application/ssml+xml; charset=utf-8".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "Azure TTS") { client.newCall(request).execute() }
             if (response.isSuccessful) {
                 val bytes = response.body?.bytes()
                 if (bytes != null && bytes.isNotEmpty()) {
@@ -1054,7 +1054,7 @@ object RealElevenLabsService {
                 .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            val response = client.newCall(request).execute()
+            val response = ApiUsageTracker.track(AppServices.appContext, "ElevenLabs") { client.newCall(request).execute() }
             if (response.isSuccessful) {
                 val bytes = response.body?.bytes()
                 if (bytes != null && bytes.isNotEmpty()) {

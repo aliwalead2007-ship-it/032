@@ -69,6 +69,18 @@
 | `RealServices.kt / VideoProcessor.kt` | **ثورة الإخراج الفني الشاملة (The Art Director Update)**: تنفيذ 5 قواعد إخراجية احترافية في الكود: 1. استعارات بصرية للمشاهد بدلاً من الترجمة الحرفية (تعديل Prompt). 2. تفعيل دائم للكابشن الحركي (Word-by-word) في `VideoProcessor`. 3. دمج فلتر (Audio Ducking) عبر `sidechaincompress` في FFmpeg لخفض الصوت المحيطي تلقائياً. 4. التلوين السينمائي النفسي عبر تعيين LUTs أو فلاتر `eq` تلقائياً تعكس المزاج (Dark teal vs Golden). 5. إيقاع تقطيع متغير (Pacing) بمدد مشاهد ديناميكية. |
 | `StyleBrain.kt` | **العقل الاستباقي النشط (Gen-2 Proactive Brain)**: تحويل `chooseBestStyleForIdea` ليدمج أسلوبين تلقائياً عبر الذكاء الاصطناعي بدلاً من الاختيار السلبي، وتوليد نمط هجين لحظي مخصص لكل فكرة.
 
+### هـ) لوحة المطور — إزالة كل البيانات المزيفة (أرقام حقيقية فقط)
+
+| ملف | ماذا أُنجز |
+|-----|------------|
+| `ApiUsageTracker.kt` (جديد) | متتبع استهلاك وزمن استجابة حقيقي لكل خدمة (`ApiStat`) يُحفظ في SharedPreferences. **البداية فارغة تماماً** (`emptyMap()`) — لا أقزام مسبقة، وتمتلئ فقط من استدعاءات HTTP الفعلية. |
+| `RealServices.kt` | تغليف **12 نقطة HTTP حقيقية** بـ `ApiUsageTracker.track(...)`: Gemini ×6، Groq، Azure TTS، ElevenLabs، HuggingFace، Pexels، Pixabay. لا توجد قياسات وهمية. |
+| `CloudServices.kt / SupabaseServices.kt` | `Database.getAllUsers()` (قائمة المستخدمين الحقيقية من Firestore ثم Supabase fallback) و`getDevUserProjectCount(uid)` (عدّ مشاريع حقيقية من `users/{uid}/projects`). |
+| `DeveloperDashboardScreen.kt` | **إزالة كل البيانات المختلقة**: قائمة المستخدمين تُحمَّل فعلياً (لا مقالات مزيفة)، إزالة أسماء أعضاء وهميين، تحويل `RevenueSection` لتحميل حقيقي عبر `observeAllTransactions().first()`، إعادة كتابة `ApiConsumptionChart` و`SystemPerformanceHealthKpiGrid` بقياسات حقيقية من `ApiUsageTracker.snapshot`، العناوين/أية خطوات نقل محنكة. |
+| `DeveloperDashboardScreen.kt` — `WeeklyEngagementTrendsChart` | **استبدال بيانات أسبوعية مختلقة بأرقام حقيقية من قاعدة البيانات المحلية**: عدّ يومي حقيقي لجدول `projects` (فيديوهات 🎬)، `reel_scripts` (نصوص AI ✍️)، `hadith_cards` (أحاديث 🎴) عبر DAO الجديدة `countXBetween(start,end)`. |
+| `DeveloperDashboardScreen.kt` — شاشات الزيارة | استبدال أرقام "الزيارات" المختلقة (84/67/52...) برسالة صادقة "لا تتوفر بيانات زيارة لكل شاشة بعد" مع مؤشرات فارغة في انتظار التتبع الفعلي. |
+| `DeveloperDashboardScreen.kt` — `formatRegDate` | معالجة `createdAt` الحقيقي بألوان/صيغ ISO عبر `SimpleDateFormat` (بدون `java.time` لأن `minSdk=24` بلا desugaring) مع fallback رقمية آمن. |
+
 ### ب) آية الدخول + السبلاش + أنيميشن دخول الاستوديو (Lottie Entry)
 
 | ملف | الحالة |
@@ -148,7 +160,7 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 
 ## 8. ملخص سطر واحد للجلسة القادمة
 
-> المسار محصَّن في الكود؛ آية الدخول والسبلاش جاهزان.  
+> المسار محصَّن في الكود؛ آية الدخول والسبلاش جاهزان؛ لوحة المطور خالية من البيانات المزيفة (مستخدمون/إيرادات/استهلاك API/عدّ أسبوعي حقيقي).  
 > **الأولوية:** نتيجة اختبار التصدير على الجهاز → ثم إصلاح أو تقوية offline فقط.  
-> تم رفع دقة تحليل Gemini لتوليد JSON صارم بدون اختلاق عبر `analyzeIdea` في `RealServices.kt`.
+> لوحة المطور: 12 نقطة HTTP ملفوفة بـ `ApiUsageTracker`، وتحميل فعلي من Firestore/Supabase/Room.  
 > وثّق كل حركة في `AGENTS.md` + `README.md`.

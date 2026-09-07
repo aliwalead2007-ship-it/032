@@ -214,6 +214,20 @@ object SupabaseServices {
                 .getOrDefault(emptyList())
         }
 
+        /**
+         * Fetch the full, real user list from the Supabase `users` table for the
+         * developer dashboard. Returns an empty list when Supabase is unavailable.
+         */
+        suspend fun getAllUsers(): List<UserRow> {
+            if (!isSupabaseAvailable) return emptyList()
+            return runCatching {
+                client.postgrest.from("users").select {
+                    order("created_at", Order.DESCENDING)
+                }.decodeList<UserRow>()
+            }.onFailure { Log.w(TAG, "getAllUsers failed: ${it.message}") }
+                .getOrDefault(emptyList())
+        }
+
         /** Build a JSON object for jsonb columns from vararg pairs. */
         fun jsonObject(vararg pairs: Pair<String, Any?>): String = JsonObject(
             pairs.associate { (k, v) ->
