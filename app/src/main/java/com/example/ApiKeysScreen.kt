@@ -912,7 +912,7 @@ fun ApiKeyCard(
     LaunchedEffect(value) {
         if (value.isNotBlank() && validationStatus is KeyValidationStatus.Idle) {
             validationStatus = KeyValidationStatus.Testing
-            val res = ApiKeyValidator.validateKey(serviceType, value)
+            val res = ApiKeyValidator.validateKey(context, serviceType, value)
             validationStatus = if (res.isValid) KeyValidationStatus.Valid(res) else KeyValidationStatus.Invalid(res)
         } else if (value.isBlank()) {
             validationStatus = KeyValidationStatus.Idle
@@ -1166,7 +1166,7 @@ fun ApiKeyCard(
                         onClick = {
                             scope.launch {
                                 validationStatus = KeyValidationStatus.Testing
-                                val res = ApiKeyValidator.validateKey(serviceType, value, secondaryValue)
+                                val res = ApiKeyValidator.validateKey(context, serviceType, value, secondaryValue)
                                 validationStatus = if (res.isValid) KeyValidationStatus.Valid(res) else KeyValidationStatus.Invalid(res)
                             }
                         },

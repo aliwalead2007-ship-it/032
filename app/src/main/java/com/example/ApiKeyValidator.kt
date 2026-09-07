@@ -52,7 +52,7 @@ object ApiKeyValidator {
         .readTimeout(12, TimeUnit.SECONDS)
         .build()
 
-    suspend fun validateKey(serviceType: String, key: String, hint: String? = null): KeyValidationResult = withContext(Dispatchers.IO) {
+    suspend fun validateKey(context: Context, serviceType: String, key: String, hint: String? = null): KeyValidationResult = withContext(Dispatchers.IO) {
         val trimmedKey = key.trim()
         if (trimmedKey.isEmpty()) {
             return@withContext KeyValidationResult(
@@ -345,7 +345,9 @@ object ApiKeyValidator {
                         .url(url)
                         .header("Ocp-Apim-Subscription-Key", trimmedKey)
                         .build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(context, "Azure TTS") {
+                        client.newCall(request).execute()
+                    }
                     val code = response.code
                     val bodyStr = response.body?.string().orEmpty()
 
@@ -376,7 +378,9 @@ object ApiKeyValidator {
                         .url(url)
                         .header("xi-api-key", trimmedKey)
                         .build()
-                    val response = client.newCall(request).execute()
+                    val response = ApiUsageTracker.track(context, "ElevenLabs") {
+                        client.newCall(request).execute()
+                    }
                     val code = response.code
                     val bodyStr = response.body?.string().orEmpty()
 

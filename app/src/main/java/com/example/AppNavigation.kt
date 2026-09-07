@@ -7,6 +7,13 @@ package com.example
  */
 
 import android.content.Context
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
@@ -18,7 +25,19 @@ fun AppNavigation(
     context: Context,
     bottomNav: @Composable () -> Unit
 ) {
-    when (state.appState) {
+    AnimatedContent(
+        targetState = state.appState,
+        transitionSpec = {
+            (slideInHorizontally(initialOffsetX = { it / 4 }, animationSpec = tween(240)) +
+                fadeIn(animationSpec = tween(240)))
+                .togetherWith(
+                    slideOutHorizontally(targetOffsetX = { -it / 4 }, animationSpec = tween(240)) +
+                        fadeOut(animationSpec = tween(240))
+                )
+        },
+        label = "qabas_screen_transition"
+    ) { appState ->
+    when (appState) {
         AppState.SPLASH -> {
             SplashScreen(
                 onSplashFinished = {
@@ -769,5 +788,6 @@ fun AppNavigation(
                 bottomBar = bottomNav
             )
         }
+    }
     }
 }

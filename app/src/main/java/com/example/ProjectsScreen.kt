@@ -129,17 +129,13 @@ fun ProjectsScreen(
                         key = { index -> projects[index].id.ifEmpty { index.toString() } }
                     ) { index ->
                         val project = projects[index]
-                        Card(
+                        QabasCard(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { onOpenProject(project) }
-                                .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(16.dp)),
-                            colors = CardDefaults.cardColors(containerColor = CardSurface),
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, Color(0xFF1E293B))
+                                .clickable { onOpenProject(project) },
+                            contentPadding = PaddingValues(16.dp)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
+                            Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
@@ -261,7 +257,6 @@ fun ProjectsScreen(
                                     }
                                 }
                             }
-                        }
                     }
                 }
             }

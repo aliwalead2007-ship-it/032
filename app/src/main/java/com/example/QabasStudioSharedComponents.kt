@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
@@ -66,6 +67,80 @@ fun TabHeaderButton(
 @Composable
 fun TabButton(title: String, isSelected: Boolean, onClick: () -> Unit) {
     TabHeaderButton(title = title, isSelected = isSelected, onClick = onClick)
+}
+
+/**
+ * Unified luxury card for Qabas — standard gold-tinted glow border and rounded corners.
+ * Use for project cards, list items and studio panels instead of ad-hoc Cards.
+ */
+@Composable
+fun QabasCard(
+    modifier: Modifier = Modifier,
+    shapeRadius: Dp = 18.dp,
+    containerColor: Color = CardSurface,
+    contentPadding: PaddingValues = PaddingValues(16.dp),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.luxuryCardStyle(shapeRadius = shapeRadius),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(shapeRadius)
+    ) {
+        Column(Modifier.padding(contentPadding), content = content)
+    }
+}
+
+/**
+ * Unified section header row — gold gradient title with optional subtitle, icon and trailing slot.
+ */
+@Composable
+fun QabasSectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    icon: ImageVector? = null,
+    trailing: @Composable (() -> Unit)? = null
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (icon != null) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(GoldPrimary.copy(alpha = 0.14f), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = GoldPrimary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = GoldPrimary,
+                fontFamily = CairoFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp
+            )
+            if (subtitle != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = TextSecondary,
+                    fontFamily = NotoSansFont,
+                    fontSize = 12.sp
+                )
+            }
+        }
+        trailing?.invoke()
+    }
 }
 
 /**
