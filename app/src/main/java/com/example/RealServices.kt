@@ -1121,14 +1121,16 @@ object AndroidTTSService {
         val latch = CountDownLatch(1)
         val ready = arrayOf(false)
 
-        val tts = android.speech.tts.TextToSpeech(context) { status ->
+        var tts: android.speech.tts.TextToSpeech? = null
+        tts = android.speech.tts.TextToSpeech(context) { status ->
             try {
                 if (status != android.speech.tts.TextToSpeech.SUCCESS) {
                     ready[0] = false
                     latch.countDown()
                     return@TextToSpeech
                 }
-                val langResult = tts.setLanguage(Locale("ar"))
+                val instance = tts ?: return@TextToSpeech
+                val langResult = instance.setLanguage(Locale("ar"))
                 if (langResult == android.speech.tts.TextToSpeech.LANG_MISSING_DATA ||
                     langResult == android.speech.tts.TextToSpeech.LANG_NOT_SUPPORTED
                 ) {
@@ -1136,8 +1138,8 @@ object AndroidTTSService {
                     latch.countDown()
                     return@TextToSpeech
                 }
-                tts.setSpeechRate(1.0f)
-                val result = tts.synthesizeToFile(text, null, outFile, "qabas_tts")
+                instance.setSpeechRate(1.0f)
+                val result = instance.synthesizeToFile(text, null, outFile, "qabas_tts")
                 ready[0] = result == android.speech.tts.TextToSpeech.SUCCESS
                 latch.countDown()
             } catch (e: Exception) {
@@ -1147,7 +1149,7 @@ object AndroidTTSService {
             }
         }
         val done = latch.await(15, TimeUnit.SECONDS)
-        try { tts.shutdown() } catch (_: Exception) {}
+        try { tts?.shutdown() } catch (_: Exception) {}
 
         if (done && ready[0] && outFile.exists() && outFile.length() > 500) {
             SystemLogsManager.addLog("SUCCESS", "تم توليد التعليق الصوتي عبر محرك النظام المجاني ✅", Color(0xFF4CAF50))
