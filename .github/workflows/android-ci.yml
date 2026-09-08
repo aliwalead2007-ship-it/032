@@ -46,6 +46,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             mkdir -p app
@@ -53,6 +55,25 @@ jobs:
             echo "google-services.json written"
           else
             echo "No GOOGLE_SERVICES_JSON secret — skipping"
+          fi
+          # .env يُبنى من أسرار GitHub إن وُجدت، وإلا يعود لقيم placeholder
+          # من .env.example (SupabaseConfig.isConfigured يرفضها → وضع محلي آمن).
+          {
+            echo "SUPABASE_URL=\"${SUPABASE_URL:-https://YOUR_PROJECT_REF.supabase.co}\""
+            echo "SUPABASE_ANON_KEY=\"${SUPABASE_ANON_KEY:-your_publishable_or_anon_key}\""
+            echo "GEMINI_API_KEY=\"${GEMINI_API_KEY:-your_key}\""
+            echo "AZURE_SPEECH_KEY=\"your_key\""
+            echo "AZURE_SPEECH_REGION=\"your_region\""
+            echo "ELEVENLABS_API_KEY=\"your_key\""
+            echo "GROQ_API_KEY=\"your_key\""
+            echo "HUGGINGFACE_API_KEY=\"your_key\""
+            echo "PEXELS_API_KEY=\"your_key\""
+            echo "PIXABAY_API_KEY=\"your_key\""
+          } > .env
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            echo ".env written — Supabase ENABLED in built APK"
+          else
+            echo ".env written — Supabase placeholders (APK runs in local mode)"
           fi
 
       - name: Compile Kotlin (fast fail)
