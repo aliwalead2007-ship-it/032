@@ -186,17 +186,12 @@ class QabasBrainRepository(private val context: Context) {
                     val obj = jsonArr.getJSONObject(i)
                     items.add(BrainDecisionHistoryItem.fromJsonObject(obj))
                 }
-                if (items.isNotEmpty()) {
-                    return@withContext items
-                }
+                return@withContext items
             }
 
-            // إذا كان السجل فارغاً لأول مرة، تهيئة سجلات توجيهية أولية غنية بالأمثلة
-            val defaultHistory = createInitialSampleDecisionHistory()
-            val jsonArr = org.json.JSONArray()
-            defaultHistory.forEach { jsonArr.put(it.toJsonObject()) }
-            prefs.edit().putString("qabas_brain_decision_history_json", jsonArr.toString()).apply()
-            return@withContext defaultHistory
+            // العقل يبدأ فارغاً ومحايداً تماماً — لا سجلات وهمية من أي نوع.
+            // يُبنى السجل حصرياً من قرارات حقيقية تُحفظ عبر saveDecisionHistoryItem.
+            return@withContext emptyList()
         } catch (e: Exception) {
             Log.e(TAG, "Error loading decision history: ${e.message}", e)
             return@withContext emptyList()
@@ -251,113 +246,4 @@ class QabasBrainRepository(private val context: Context) {
         }
     }
 
-    private fun createInitialSampleDecisionHistory(): List<BrainDecisionHistoryItem> {
-        val now = System.currentTimeMillis()
-        val coreStyle = StyleObject(
-            id = "style_qabas_core",
-            name = "هوية قبس النورانية",
-            visualStyle = VisualStylePattern(
-                dominantColors = "Deep Slate #0B0F19 مع ذهب قبس #E8C547",
-                primaryColorHex = "#E8C547",
-                backgroundColorHex = "#0B0F19",
-                visualTraits = listOf("خلفية داكنة فاخرة", "نصوص ذهبية متوهجة", "تباين عالي")
-            ),
-            motionRhythm = MotionRhythmPattern(
-                transitionSpeed = "متوسطة متوازنة",
-                transitionType = "Dissolve",
-                movementPatterns = "Slow Cinematic Zoom-in",
-                overallRhythm = "تصاعدي وقور ومؤثر"
-            ),
-            contentTone = ContentTonePattern(
-                tone = "وقور وملهم",
-                targetAudience = "الجمهور العام",
-                typographyStyle = "خط كوفي عريض في المنطقة الآمنة"
-            ),
-            overallScore = 96
-        )
-
-        val cinematicStyle = StyleObject(
-            id = "style_cinematic_nature",
-            name = "الوثائقي الدعوي الهادئ",
-            visualStyle = VisualStylePattern(
-                dominantColors = "درجات الزمردي #1A4D2E مع إضاءة ناعمة #F5D76E",
-                primaryColorHex = "#F5D76E",
-                backgroundColorHex = "#1A4D2E",
-                visualTraits = listOf("طبيعة وتأمل", "إضاءة ناعمة", "ألوان ترابية وزمردية")
-            ),
-            motionRhythm = MotionRhythmPattern(
-                transitionSpeed = "بطيئة متدرجة",
-                transitionType = "Crossfade",
-                movementPatterns = "Pan Up",
-                overallRhythm = "هادئ وتأملي"
-            ),
-            contentTone = ContentTonePattern(
-                tone = "هادئ وتأملي",
-                targetAudience = "الشباب والمهتمين بالتزكية",
-                typographyStyle = "خط رقعة سينمائي"
-            ),
-            overallScore = 93
-        )
-
-        return listOf(
-            BrainDecisionHistoryItem(
-                id = "history_sample_1",
-                timestamp = now - (1000 * 60 * 15), // منذ 15 دقيقة
-                ideaInput = "فضل صيام يوم عرفة وتكفير ذنوب سنتين بأسلوب مؤثر وسينمائي",
-                tone = "وقور وملهم",
-                targetAudience = "الجمهور العام من الشباب والمهتمين بالفضائل",
-                decision = BrainDecision(
-                    title = "يوم عرفة: فرصة المغفرة العظمى",
-                    hook = "ما من يوم أكثر من أن يعتق الله فيه عبداً من النار من يوم عرفة.. هل أنت مستعد؟",
-                    scriptScenes = listOf(
-                        Scene("المقدمة المشوقة", "زووم بطيء على سماء الغروب مع نبرة وقورة مهيبة", 5, "Slow ZoomIn", "متوسط", "Dissolve"),
-                        Scene("صلب الرسالة", "عرض حديث النبي ﷺ عن صيام يوم عرفة وتكفير سنة ماضية وقادمة", 10, "Gold Text Focus", "تصاعدي", "Fade"),
-                        Scene("الخاتمة والدعوة", "دعوة لاغتنام الساعات الفاضلة بالدعاء والاستغفار", 5, "Cinematic Dimming", "هادئ", "Cut")
-                    ),
-                    voiceOverTone = "وقور وملهم",
-                    visualDirectives = "خلفية داكنة DeepSlate #0B0F19 مع إضاءة ذهبية مركزة على النصوص العربية الكوفية",
-                    primaryColorHex = "#E8C547",
-                    backgroundColorHex = "#0B0F19",
-                    ffmpegFilterSnippet = "scale=1080:1920,zoompan=z='min(zoom+0.0015,1.08)':d=125,eq=contrast=1.15:brightness=0.02",
-                    audioSfxSuggestions = listOf("صوت هواء دافئ ناعم", "أثر خفيف لصدى الكلمات"),
-                    selectedStyleName = coreStyle.name,
-                    compatibilityScore = 96,
-                    aiRationale = "تم اختيار هوية قبس النورانية لتحقيق أقصى درجات الوقار والهيبة لتعظيم فضل يوم عرفة مع تباين ألوان هادئ يجذب انتباه المشاهد فوراً.",
-                    targetAudience = "الجمهور العام",
-                    callToAction = "شارك المقطع لتنال أجر الدال على الخير"
-                ),
-                influencingStyleObject = coreStyle,
-                userFeedback = true
-            ),
-            BrainDecisionHistoryItem(
-                id = "history_sample_2",
-                timestamp = now - (1000 * 60 * 60 * 3), // منذ 3 ساعات
-                ideaInput = "أثر الكلمة الطيبة في بناء النفوس وجبر الخواطر",
-                tone = "هادئ وتأملي",
-                targetAudience = "صناع المحتوى والدعاة",
-                decision = BrainDecision(
-                    title = "الكلمة الطيبة: صدقة تحيي القلوب",
-                    hook = "رب كلمة لم تلق لها بالاً أنقذت قلباً من الانكسار.. كيف نغرس الطمأنينة؟",
-                    scriptScenes = listOf(
-                        Scene("افتتاحية التأمل", "مشهد انسيابي مع ظهور عبارة 'ألم تر كيف ضرب الله مثلاً كلمة طيبة'", 6, "Soft Crossfade", "هادئ", "Dissolve"),
-                        Scene("المعنى النفسي والشرعي", "تأثير الكلام الطيب كشجرة طيبة أصلها ثابت وفرعها في السماء", 8, "Slow Pan Up", "انسيابي", "Dissolve"),
-                        Scene("الختام العملي", "اجعل لسانك بلسماً لمن حولك في كل لقاء", 5, "Subtle Gold Vignette", "خاشع", "Fade")
-                    ),
-                    voiceOverTone = "هادئ وتأملي",
-                    visualDirectives = "درجات الزمردي الإسلامي #1A4D2E مع إضاءة ناعمة وحركات انتقال بطيئة Dissolve",
-                    primaryColorHex = "#F5D76E",
-                    backgroundColorHex = "#1A4D2E",
-                    ffmpegFilterSnippet = "scale=1080:1920,fade=t=in:st=0:d=1,eq=saturation=1.1:contrast=1.05",
-                    audioSfxSuggestions = listOf("رنين مائي هادئ", "صوت نسيم خفيف"),
-                    selectedStyleName = cinematicStyle.name,
-                    compatibilityScore = 93,
-                    aiRationale = "الاعتماد على نمط وثائقي دعوي هادئ لتعزيز الطمأنينة والسكينة النفسية المتوافقة مع مفهوم جبر الخواطر.",
-                    targetAudience = "الشباب والمهتمين بالتزكية",
-                    callToAction = "اكتب كلمة طيبة لشخص عزيز الآن"
-                ),
-                influencingStyleObject = cinematicStyle,
-                userFeedback = null
-            )
-        )
-    }
 }

@@ -49,11 +49,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * شاشة البداية الرسمية لاستوديو قبس (Official Qabas Studio Splash Screen)
- * - هوية قبس الرسمية الكاملة: الشعلة الذهبية المتوهجة فوق الكتاب المفتوح + قبس + الآية الكريمة
- * - أنيميشن سينمائي خفيف وفائق السلاسة (Fade + Scale + Soft Ambient Glow)
- * - بدون أي تشغيل صوتي
- * - دعم التخطي السريع ولمس الشاشة مع مهلة أمان قصوى
+ * شاشة البداية الرسمية لاستوديو قبس — نسخة «الكتاب المفتوح» (Book Opening Splash)
+ * - كتاب قوّل يُفتح من المنتصف (الغلافان يدوران حول محور العمود الفقري) يكشف شعلة قبس + الآية
+ * - تمثيل ثلاثي الأبعاد خفيف (rotationY + cameraDistance) سباع الحركة بسلاسة GPU
+ * - نفس التزامات الشاشة السابقة: التخطي، لمس الشاشة، مهلة أمان قصوى، بدون صوت
  */
 @Composable
 fun SplashScreen(
@@ -67,62 +66,70 @@ fun SplashScreen(
         onSplashFinished()
     }
 
-    // Animation Controllers (Lightweight, GPU-friendly Animatable properties)
     val glowAlpha = remember { Animatable(0f) }
-    val logoAlpha = remember { Animatable(0f) }
-    val logoScale = remember { Animatable(0.92f) }
+    val bookAlpha = remember { Animatable(0f) }
     val exitAlpha = remember { Animatable(1f) }
     val skipButtonAlpha = remember { Animatable(0f) }
 
-    // Controlled Timeline Choreography
+    // 0f = مغلق .. 1f = مفتوح بالكامل
+    val openProgress = remember { Animatable(0f) }
+    // توهج خلفي غامق أثناء الإغلاق -> ذهبي مشع عند الاكتمال
+    val revealGlow = remember { Animatable(0f) }
+    val logoAlpha = remember { Animatable(0f) }
+    val logoScale = remember { Animatable(0.85f) }
+
     LaunchedEffect(Unit) {
-        // 1. Soft ambient glow emergence
+        // 1. ظهور مرحلي ناعم للكتاب المغلق مع هالة أساسية
         launch {
-            glowAlpha.animateTo(
+            bookAlpha.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+        }
+        launch {
+            glowAlpha.animateTo(1f, tween(900, easing = FastOutSlowInEasing))
+        }
+
+        delay(250)
+
+        // 2. فتح الكتاب من العمود الفقري
+        launch {
+            openProgress.animateTo(
                 targetValue = 1f,
-                animationSpec = tween(durationMillis = 800, easing = FastOutSlowInEasing)
+                animationSpec = tween(1100, easing = FastOutSlowInEasing)
             )
         }
 
-        // 2. Cinematic Logo Entry (Smooth Spring + Fade)
-        delay(150)
+        // 3. الشعلة والآية تظهران أثناء اكتمال الفتح
+        delay(450)
         launch {
-            logoAlpha.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 700, easing = FastOutSlowInEasing)
-            )
+            logoAlpha.animateTo(1f, tween(750, easing = FastOutSlowInEasing))
         }
         launch {
             logoScale.animateTo(
-                targetValue = 1f,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessLow
-                )
+                1f,
+                spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow)
             )
         }
 
-        // 3. Reveal Skip button after logo stabilizes
-        delay(400)
+        // 4. إشعاع الذهب عند الفتح الكامل
+        delay(380)
         launch {
-            skipButtonAlpha.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
-            )
+            revealGlow.animateTo(1f, tween(650, easing = FastOutSlowInEasing))
         }
 
-        // 4. Steady presentation hold (~1.5s)
-        delay(1500)
+        // 5. ظهور زر التخطي بعد استقرار المشهد
+        delay(350)
+        launch {
+            skipButtonAlpha.animateTo(1f, tween(500, easing = FastOutSlowInEasing))
+        }
 
-        // 5. Smooth dissolve exit into Studio
-        exitAlpha.animateTo(
-            targetValue = 0f,
-            animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing)
-        )
+        // 6. فترة عرض مستقرة
+        delay(1100)
+
+        // 7. ذوبان الخروج نحو الاستوديو
+        exitAlpha.animateTo(0f, tween(450, easing = FastOutSlowInEasing))
         close()
     }
 
-    // Safety timeout fallback (never get stuck)
+    // مهلة أمان قصوى — لا يُعلَّق التطبيق أبداً
     LaunchedEffect(Unit) {
         delay(4500)
         close()
@@ -130,12 +137,14 @@ fun SplashScreen(
 
     val skipInteraction = remember { MutableInteractionSource() }
 
-    // Brand Palette
+    // هوية قبس
     val voidBlack = Color(0xFF03060C)
     val deepNavy = Color(0xFF060D19)
     val goldPrimary = Color(0xFFE8C547)
     val goldLight = Color(0xFFFFF1A8)
     val goldWarm = Color(0xFFB88E28)
+    val spineBase = Color(0xFF3A2E10)
+    val invoice = Color(0xFFF8F1DD)
 
     Box(
         modifier = Modifier
@@ -153,22 +162,21 @@ fun SplashScreen(
             ) { close() },
         contentAlignment = Alignment.Center
     ) {
-        // 1. Gentle Ambient Golden Halo Glow (Behind Logo)
+        // 1. هالة ذهبية ضبابية خلف المشهد
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    alpha = glowAlpha.value * exitAlpha.value * 0.85f
+                    alpha = glowAlpha.value * exitAlpha.value * 0.85f + revealGlow.value * 0.35f
                 }
         ) {
             val centerOffset = Offset(size.width / 2f, size.height * 0.40f)
             val glowRadius = size.minDimension * 0.55f
-
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        goldLight.copy(alpha = 0.22f),
-                        goldPrimary.copy(alpha = 0.12f),
+                        goldLight.copy(alpha = 0.22f + revealGlow.value * 0.35f),
+                        goldPrimary.copy(alpha = 0.12f + revealGlow.value * 0.25f),
                         goldWarm.copy(alpha = 0.04f),
                         Color.Transparent
                     ),
@@ -180,79 +188,181 @@ fun SplashScreen(
             )
         }
 
-        // 2. Main Center Stage: Official Qabas Visual Identity
+        // 2. الكتاب المفتوح — نصفان يدوران حول العمود الفقري
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .fillMaxWidth(0.82f)
                 .graphicsLayer {
-                    alpha = logoAlpha.value * exitAlpha.value
-                    scaleX = logoScale.value
-                    scaleY = logoScale.value
+                    alpha = bookAlpha.value * exitAlpha.value
                 },
             contentAlignment = Alignment.Center
         ) {
-            // Attempt to load the official identity artwork (R.drawable.qabas_logo)
-            val logoPainter = runCatching {
-                painterResource(id = R.drawable.qabas_logo)
-            }.getOrNull()
+            // ارسم النصفين جنباً إلى جنب داخل صندوق عرض واحد
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                val halfWidth = 0.46f
 
-            if (logoPainter != null) {
-                Image(
-                    painter = logoPainter,
-                    contentDescription = "شعار قبس الرسمي",
+                // النصف الأيمن من الكتاب (غلاف فاخر داكن بحواف ذهبية)
+                Box(
                     modifier = Modifier
-                        .widthIn(max = 380.dp)
-                        .fillMaxWidth(0.92f),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                // Graceful fallback if resource is unavailable: Elegant Calligraphy & Verse
-                Column(
+                        .align(Alignment.Center)
+                        .fillMaxWidth(halfWidth)
+                        .padding(horizontal = 2.dp)
+                        .graphicsLayer {
+                            val angle = -90f * (1f - openProgress.value)
+                            rotationY = angle
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                            cameraDistance = 36f * density
+                            val backsideShown = openProgress.value in 0.4f..0.6f
+                            alpha = if (backsideShown) 0.35f else 1f
+                        }
+                        .background(
+                            Brush.linearGradient(
+                                listOf(goldWarm, spineBase, goldWarm.copy(alpha = 0.7f))
+                            ),
+                            RoundedCornerShape(topEnd = 14.dp, bottomEnd = 14.dp)
+                        )
+                        .border(1.5.dp, goldPrimary.copy(alpha = 0.5f), RoundedCornerShape(topEnd = 16.dp, bottomEnd = 16.dp))
+                ) {}
+
+                // الصفحة اليمنى (ورقية فاتحة) — الجانب المعروض داخل الغلاف الأيمن
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                        .align(Alignment.Center)
+                        .fillMaxWidth(halfWidth)
+                        .padding(horizontal = 2.dp)
+                        .graphicsLayer {
+                            val angle = -90f * (1f - openProgress.value)
+                            rotationY = angle
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
+                            cameraDistance = 40f * density
+                        }
+                        .background(
+                            Brush.linearGradient(
+                                listOf(invoice, Color(0xFFEFE6CC), Color(0xFFD9CBA4))
+                            ),
+                            RoundedCornerShape(topEnd = 8.dp, bottomEnd = 8.dp)
+                        )
+                        .border(0.5.dp, goldWarm.copy(alpha = 0.25f), RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
+                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                    contentAlignment = Alignment.TopCenter
                 ) {
                     Text(
-                        text = "✦",
-                        color = goldLight,
-                        fontSize = 32.sp,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "قَـبَـسْ",
-                        color = goldPrimary,
-                        fontSize = 54.sp,
+                        text = "۞",
+                        color = goldWarm,
+                        fontSize = 18.sp,
                         fontFamily = AmiriFont,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center
+                        fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // النصف الأيسر من الكتاب (غلاف)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth(halfWidth)
+                        .padding(horizontal = 2.dp)
+                        .graphicsLayer {
+                            val angle = 90f * (1f - openProgress.value)
+                            rotationY = angle
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+                            cameraDistance = 36f * density
+                        }
+                        .background(
+                            Brush.linearGradient(
+                                listOf(goldWarm, spineBase, goldWarm.copy(alpha = 0.7f))
+                            ),
+                            RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp)
+                        )
+                        .border(1.5.dp, goldPrimary.copy(alpha = 0.5f), RoundedCornerShape(topStart = 16.dp, bottomStart = 16.dp))
+                ) {}
+
+                // الصفحة اليسرى (ورقية)
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth(halfWidth)
+                        .padding(horizontal = 2.dp)
+                        .graphicsLayer {
+                            val angle = 90f * (1f - openProgress.value)
+                            rotationY = angle
+                            transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+                            cameraDistance = 40f * density
+                        }
+                        .background(
+                            Brush.linearGradient(
+                                listOf(invoice, Color(0xFFEFE6CC), Color(0xFFD9CBA4))
+                            ),
+                            RoundedCornerShape(topStart = 8.dp, bottomStart = 8.dp)
+                        )
+                        .border(0.5.dp, goldWarm.copy(alpha = 0.25f), RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp))
+                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                    contentAlignment = Alignment.TopCenter
+                ) {
                     Text(
-                        text = "استوديو الإنتاج وصناعة الأثر",
-                        color = Color.White.copy(alpha = 0.85f),
-                        fontSize = 14.sp,
-                        fontFamily = TajawalFont,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "« ادْعُ إِلَىٰ سَبِيلِ رَبِّكَ بِالْحِكْمَةِ وَالْمَوْعِظَةِ الْحَسَنَةِ »",
-                        color = goldPrimary.copy(alpha = 0.95f),
-                        fontSize = 15.sp,
+                        text = "﴾أَلَا بِذِكْرِ اللهِ تَطْمَئِنُّ الْقُلُوبُ﴿",
+                        color = goldWarm.copy(alpha = 0.7f),
+                        fontSize = 11.sp,
                         fontFamily = CairoFont,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
                     )
                 }
+
+                // 3. محتوى الكتاب العلوي: شعلة قبس + شعار + الآية — يطفو كشفاً فوق الصفحات
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            alpha = logoAlpha.value * exitAlpha.value
+                            scaleX = logoScale.value
+                            scaleY = logoScale.value
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    // شعلة قبس الذهبية المتوهجة (رمزية مرسومة بسيطة بدل صورة إن توفرت)
+                    Text("✦", color = goldLight, fontSize = 42.sp, textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text("قَـبَـسْ", color = goldPrimary, fontSize = 52.sp, fontFamily = AmiriFont, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        "استوديو الإنتاج وصناعة الأثر",
+                        color = Color.White.copy(alpha = 0.85f),
+                        fontSize = 15.sp,
+                        fontFamily = TajawalFont,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // 4. الآية السفلية داخل الكتاب
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp)
+                        .graphicsLayer {
+                            alpha = logoAlpha.value * exitAlpha.value * 0.92f
+                        }
+                ) {
+                    Text(
+                        text = "« ادْعُ إِلَىٰ سَبِيلِ رَبِّكَ بِالْحِكْمَةِ وَالْمَوْعِظَةِ الْحَسَنَةِ »",
+                        color = goldPrimary.copy(alpha = 0.95f),
+                        fontSize = 14.sp,
+                        fontFamily = CairoFont,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
             }
         }
 
-        // 3. Elegant Skip Pill at Bottom
+        // 5. زر التخطي أسفل الشاشة
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)

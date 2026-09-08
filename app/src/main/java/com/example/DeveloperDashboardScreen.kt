@@ -35,9 +35,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.draw.clip
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import java.io.File
 
 
-enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN }
+enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN }
 
 data class DevUser(
     val id: String,
@@ -115,6 +116,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                             DashboardSection.USERS -> "إدارة الحسابات"
                             DashboardSection.STATS -> "الإحصائيات المباشرة"
                             DashboardSection.LOGS -> "سجلات النظام (Logs)"
+                            DashboardSection.CRASH_LOGS -> "سجل الانهيارات 🛡️"
                             DashboardSection.ACCOUNT_SETTINGS -> "إعدادات حساب المطور"
                             DashboardSection.PROMO_CODES -> "المكافآت والأكواد"
                             DashboardSection.REVENUE -> "المبيعات والإيرادات"
@@ -252,6 +254,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                             currentSection = DashboardSection.STATS 
                         },
                         onLogs = { currentSection = DashboardSection.LOGS },
+                        onCrashLogs = { currentSection = DashboardSection.CRASH_LOGS },
                         onAccountSettings = { currentSection = DashboardSection.ACCOUNT_SETTINGS },
                         onPromoCodes = { currentSection = DashboardSection.PROMO_CODES },
                         onRevenue = { currentSection = DashboardSection.REVENUE },
@@ -259,7 +262,8 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                         onAgencyMonetization = { currentSection = DashboardSection.AGENCY_MONETIZATION },
                         onDevPortfolioShowcase = { currentSection = DashboardSection.DEV_PORTFOLIO_SHOWCASE },
                         onAppDoctor = { currentSection = DashboardSection.APP_DOCTOR },
-                        onStyleBrain = { currentSection = DashboardSection.STYLE_BRAIN }
+                        onStyleBrain = { currentSection = DashboardSection.STYLE_BRAIN },
+                        userCount = devUsers.size
                     )
                 }
                 DashboardSection.APP_DOCTOR -> {
@@ -303,6 +307,9 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                 DashboardSection.LOGS -> {
                     LogsSection(devLogs = devLogs)
                 }
+                DashboardSection.CRASH_LOGS -> {
+                    CrashLogsSection(context = context)
+                }
                 DashboardSection.PROMO_CODES -> {
                     PromoCodesSection(context = context)
                 }
@@ -322,15 +329,17 @@ fun DashboardMainGrid(
     onUsers: () -> Unit,
     onStats: () -> Unit,
     onLogs: () -> Unit,
+                    onCrashLogs: () -> Unit,
     onAccountSettings: () -> Unit,
     onPromoCodes: () -> Unit,
     onRevenue: () -> Unit,
     onDevStudioSignature: () -> Unit,
     onAgencyMonetization: () -> Unit,
     onDevPortfolioShowcase: () -> Unit,
-    onAppDoctor: () -> Unit,
-    onStyleBrain: () -> Unit
-) {
+onAppDoctor: () -> Unit,
+                        onStyleBrain: () -> Unit,
+                        userCount: Int = 0
+                    ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
@@ -420,7 +429,7 @@ fun DashboardMainGrid(
                     ) {
                         QuickMetric(Icons.Default.MedicalServices, "حالة التطبيق", diagnosticSummary)
                         QuickMetric(Icons.Default.CloudSync, "الشبكة", if (isGridOnline) "متصلة" else "منقطعة")
-                        QuickMetric(Icons.Default.Group, "المستخدمين", "2")
+                        QuickMetric(Icons.Default.Group, "المستخدمين", userCount.toString())
                     }
                 }
             }
@@ -439,6 +448,7 @@ fun DashboardMainGrid(
             Triple("إرسال الإشعارات", Icons.Default.Notifications, onNotifications),
             Triple("طلبات التطبيقات", Icons.Default.Build, onRequestSection),
             Triple("التحكم في النظام", Icons.Default.Settings, onSystemControls),
+            Triple("سجل الانهيارات 🛡️", Icons.Default.BugReport, onCrashLogs),
             Triple("إعدادات حساب المطور", Icons.Default.ManageAccounts, onAccountSettings)
         )
 
@@ -1995,6 +2005,223 @@ fun LogsSection(devLogs: androidx.compose.runtime.snapshots.SnapshotStateList<Sy
                 }
             }
         }
+    }
+}
+
+data class CrashLogFile(
+    val fileName: String,
+    val timestampMs: Long,
+    val thread: String,
+    val exceptionLine: String,
+    val fullStack: String
+)
+
+fun loadCrashLogs(context: Context): List<CrashLogFile> {
+    return try {
+        val dir = File(context.filesDir, "crash_logs")
+        if (!dir.exists()) return emptyList()
+        dir.listFiles()
+            ?.filter { it.name.startsWith("crash_") && it.name.endsWith(".txt") }
+            ?.sortedByDescending { it.lastModified() }
+            ?.map { file ->
+                val content = runCatching { file.readText() }.getOrElse { "" }
+                val thread = content.lineSequence()
+                    .firstOrNull { it.startsWith("Thread:") }
+                    ?.removePrefix("Thread:")
+                    ?.trim() ?: "غير معروف"
+                val exceptionLine = content.lineSequence()
+                    .firstOrNull { it.contains("Exception") || it.contains("Error") || it.contains("FATAL") }
+                    ?.trim().orEmpty()
+                CrashLogFile(
+                    fileName = file.name,
+                    timestampMs = file.lastModified(),
+                    thread = thread,
+                    exceptionLine = exceptionLine,
+                    fullStack = content
+                )
+            }
+            ?: emptyList()
+    } catch (e: Exception) {
+        emptyList()
+    }
+}
+
+class CrashDiagnosis(
+    val why: String,
+    val how: String,
+    val fix: String
+)
+
+fun diagnoseCrash(crash: CrashLogFile): CrashDiagnosis {
+    val full = crash.fullStack.lowercase()
+    val exc = crash.exceptionLine.lowercase()
+    return when {
+        "outofmemory" in exc || "oom" in exc || "could not allocate" in full ->
+            CrashDiagnosis(
+                why = "نفاد الذاكرة (OutOfMemory) أثناء الاستخراج أو المعالجة أو فتح فيديوهات كبيرة.",
+                how = "حدث خلال مرحلة استخراج الإطارات المفتاحية أو دمج/معالجة الفيديو أو تحميل أصول ضخمة دفعة واحدة.",
+                fix = "أغلق التطبيقات الخلفية الثقيلة، أعد تشغيل الجهاز، وجرّب فكرة أقصر؛ إن تكرر حدّث حارس الذاكرة على استخراج الإطارات (MediaMetadataRetriever) لتقليص التحجيم."
+            )
+        "arthenica" in full || "ffmpeg" in full || "ffmpegkit" in full ->
+            CrashDiagnosis(
+                why = "فشل محرك FFmpeg أثناء ترميز/دمج/تحويل الفيديو (صيغة غير مدعومة، نقص مساحة، أو أمر غير صالح).",
+                how = "حدث أثناء التصدير النهائي للفيديو عبر FFmpegKit (xfade/تفريغ/دمج المسارات).",
+                fix = "تحقق من المساحة الحرة، استخدم مقطعا أقصر، وأعد المحاولة؛ إن تكرر شارك الفيديو الخام والسجل الكامل من لوحة المطور (سجلات النظام)."
+            )
+        "nullpointerexception" in exc || "nullpointer" in exc || "kotlin.null" in full ->
+            CrashDiagnosis(
+                why = "مرجع فارغ (Null) في مسار غير متوقّع داخل الكود.",
+                how = "استدعت دالة قيمة غير موجودة (كائن لم يُملأ أو ملف فُقد قبل الوصول إليه).",
+                fix = "أعد المحاولة بنفس الفكرة لإعادة إنشاء الكائنات؛ إن تكرر أرسل الستاك الكامل للمطور لاعتماد حارس فارغ في النقطة المحددة."
+            )
+        "gemini" in exc || "com.google.ai" in full || "generativelanguage" in full || "api key" in full ->
+            CrashDiagnosis(
+                why = "مفتاح Gemini مفقود/انتهت حصته أو استجابة النموذج غير قابلة للتحليل.",
+                how = "حدث أثناء استدعاء تحليل الفكرة أو توليد السكربت أو تطبيق الأسلوب عبر Gemini.",
+                fix = "افتح شاشة المفاتيح وتحقق من مفتاح Gemini (يبدأ بـ AIzaSy) أو أضف مفتاحا جديدا من aistudio.google.com، ثم أعد المحاولة."
+            )
+        "socket" in exc || "connectexception" in exc || "unknownhost" in exc || "timeout" in exc || "ssl" in exc ->
+            CrashDiagnosis(
+                why = "انقطاع الشبكة أو حجب الاتصال بالسيرفر (خارج عن التطبيق).",
+                how = "حدث أثناء جلب وسائط أو استدعاء AI أو مزامنة سحابية ولم يكتمل الرد خلال المهلة.",
+                fix = "تحقق من اتصال الإنترنت؛ التطبيق يعمل بلا مفاتيح عبر الخلفيات البرمجية والنطق المدمج، لكن الخدمات السحابية تحتاج شبكة مستقرة."
+            )
+        "pexels" in exc || "pixabay" in exc ->
+            CrashDiagnosis(
+                why = "فشل جلب/تحميل مقطع B-Roll من Pexels/Pixabay (مفتاح أو ترخيص أو رفض عن بُعد).",
+                how = "حدث أثناء تحميل الأصول البصرية لملء مشاهد الفيديو.",
+                fix = "تحقق من مفاتيح Pexels/Pixabay في شاشة المفاتيح أو أعد المحاولة؛ التطبيق يتحول تلقائياً للخلفية البرمجية (Procedural) كبديل مضمون."
+            )
+        "jsonexception" in exc || "org.json" in full ->
+            CrashDiagnosis(
+                why = "استجابة JSON تالفة أو غير متوقعة من إحدى خدمات الذكاء الاصطناعي.",
+                how = "حدث عند قراءة مخرجات Gemini/Supabase وعدم مطابقتها للصيغة المنتظرة.",
+                fix = "أعد المحاولة (الاستجابات عشوائية أحياناً)؛ إن تكرر فعّل سجل النظام وأرسل التحليل الخام للمطور لتحصين التنسيق."
+            )
+        "texttospeech" in exc || "azurespeech" in exc || "elevenlabs" in exc ->
+            CrashDiagnosis(
+                why = "فشل محرك توليد الصوت (نظام TTS أو مفتاح Azure/ElevenLabs).",
+                how = "حدث أثناء مرحلة التعليق الصوتي للفيديو.",
+                fix = "سيحاول التطبيق النطق المدمج تلقائياً؛ إن لم يعمل أعد التشغيل وكرر التوليد، وتأكد من تثبيت أصوات عربية على جهازك."
+            )
+        "supabase" in full || "retrofit" in full ->
+            CrashDiagnosis(
+                why = "خطأ في الاتصال بطبقة Supabase السحابية أو استجابة من قاعدة البيانات.",
+                how = "حدث أثناء مزامنة المستخدمين/المشاريع/الإحصائيات الخادمية.",
+                fix = "تحقق من الاتصال؛ التطبيق يتدهور للوضع المحلي بأمان عند غياب الخادم، ويمكنك المتابعة دون سحابة."
+            )
+        else ->
+            CrashDiagnosis(
+                why = "استثناء غير متصنّف — حدث نادر في مسار غير محصّن.",
+                how = "انقطع التنفيذ فجأة أثناء إحدى مراحل الإنتاج على فكرة ما، وسجّله حارس الانهيارات فوراً مع الستاك الكامل.",
+                fix = "انسخ سطر الاستثناء الأول مع الستاك الكامل وأرسله للمطور لإضافة الحالة إلى محصّن QabasCrashGuard."
+            )
+    }
+}
+
+@Composable
+fun CrashLogsSection(context: Context) {
+    var crashFiles by remember { mutableStateOf(loadCrashLogs(context)) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("سجل الانهيارات (${crashFiles.size})", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Row {
+                TextButton(onClick = { crashFiles = loadCrashLogs(context) }) {
+                    Text("تحديث", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 12.sp)
+                }
+                TextButton(onClick = {
+                    runCatching {
+                        File(context.filesDir, "crash_logs").listFiles()?.forEach { it.delete() }
+                    }
+                    crashFiles = emptyList()
+                }) {
+                    Text("مسح الكل", color = Color.Red, fontFamily = NotoSansFont, fontSize = 12.sp)
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(CardSurface, RoundedCornerShape(12.dp))
+                .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(12.dp))
+                .padding(16.dp)
+        ) {
+            if (crashFiles.isEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("لا توجد انهيارات مسجَّلة 🎉", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 15.sp)
+                    Text(
+                        "كل انهيار مستقبلي يُسجَّل هنا تلقائياً عبر QabasCrashGuard مع تشخيص «لماذا/كيف/الحل»، وفي حالة انهيار الواجهة يُعاد إطلاق التطبيق تلقائياً.",
+                        color = Color.Gray.copy(alpha = 0.7f),
+                        fontFamily = NotoSansFont,
+                        fontSize = 12.sp
+                    )
+                }
+            } else {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(crashFiles) { crash ->
+                        val diag = remember(crash.fileName) { diagnoseCrash(crash) }
+                        var expanded by remember(crash.fileName) { mutableStateOf(false) }
+                        val stamp = runCatching {
+                            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                                .format(java.util.Date(crash.timestampMs))
+                        }.getOrElse { crash.fileName }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0F1629), RoundedCornerShape(10.dp))
+                                .border(1.dp, Color(0xFF232D47), RoundedCornerShape(10.dp))
+                                .clickable { expanded = !expanded }
+                                .padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🛡️", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("انهيار ${crash.fileName}", color = Color.White, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                                Text(stamp, color = Color.Gray, fontFamily = NotoSansFont, fontSize = 11.sp)
+                            }
+                            Text(
+                                text = crash.exceptionLine.ifBlank { "لم يُلتقط سطر استثناء واضح — افحص الستاك الكامل." },
+                                color = Color(0xFFF87171),
+                                fontFamily = CairoFont,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 12.sp,
+                                maxLines = 2,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+
+                            if (expanded) {
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    DiagnosisRow("لماذا ‽", diag.why, Color(0xFFFB7185))
+                                    DiagnosisRow("كيف حدث؟", diag.how, Color(0xFFFBBF24))
+                                    DiagnosisRow("الحل ✓", diag.fix, Color(0xFF34D399))
+                                    Text("الخيط: ${crash.thread}", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text("اضغط لعرض السجل كاملاً ▾", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 11.sp)
+                                }
+                            } else {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("اضغط للتفاصيل • لماذا ‽ كيف ♪ الحل ✓", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 11.sp)
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Text(if (expanded) "▴" else "▾", color = Color(0xFF22D3EE), fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DiagnosisRow(label: String, text: String, accent: Color) {
+    Row(verticalAlignment = Alignment.Top) {
+        Text(label, color = accent, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.width(78.dp))
+        Text(text, color = Color.LightGray, fontFamily = NotoSansFont, fontSize = 12.sp, modifier = Modifier.weight(1f))
     }
 }
 
