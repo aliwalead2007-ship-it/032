@@ -13,6 +13,8 @@ class QabasApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        QabasCrashGuard.install(this)
+
         // Initialize Firebase & Analytics with respect to user settings
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {
