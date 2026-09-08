@@ -66,6 +66,21 @@ object ApiKeyValidator {
         try {
             when (serviceType.lowercase()) {
                 "gemini" -> {
+                    if (!Regex("""AIza[A-Za-z0-9_\-]{35,}""").matches(trimmedKey)) {
+                        val looksGlobish = trimmedKey.startsWith("AQ.", ignoreCase = true)
+                        val reason = if (looksGlobish) {
+                            "المفتاح الذي لصقته يبدأ بـ «AQ.» وهو صيغة توكن OAuth (Googles أحادية الاستخدام) أو مفتاح خدمة إعلانية، وليس مفتاح Gemini API."
+                        } else {
+                            "مفتاح Gemini API الصحيح يبدأ دائماً بالبادئة «AIzaSy» ويتكون من 39 محرفاً. المفتاح الذي أدخلته لا يطابق تلك التركيبة."
+                        }
+                        SystemLogsManager.addLog("ERROR", "مفتاح Gemini غير صالح الصيغة - صيغة غير AIza", Color(0xFFEF4444))
+                        return@withContext KeyValidationResult(
+                            isValid = false,
+                            summary = "صيغة المفتاح غير صحيحة 🔴",
+                            explanation = reason,
+                            suggestedFix = "افتح aistudio.google.com/app/apikey ثم اضغط «Create API key» في مشروع جديد وانسخ المفتاح كاملاً (يبدأ بـ AIzaSy…) دون أي مسافات."
+                        )
+                    }
                     val url = "https://generativelanguage.googleapis.com/v1beta/models?key=$trimmedKey"
                     val request = Request.Builder().url(url).build()
                     val response = ApiUsageTracker.track(context, "Gemini") { client.newCall(request).execute() }

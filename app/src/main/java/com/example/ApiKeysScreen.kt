@@ -1309,7 +1309,29 @@ fun ApiKeyCard(
                                 tint = GoldPrimary
                             )
                         }
-if (value.isBlank()) {
+                        if (value.isNotBlank()) {
+                            Icon(
+                                imageVector = when (validationStatus) {
+                                    is KeyValidationStatus.Valid -> Icons.Default.CheckCircle
+                                    is KeyValidationStatus.Invalid -> Icons.Default.Error
+                                    else -> Icons.Default.CheckCircle
+                                },
+                                contentDescription = null,
+                                tint = when (validationStatus) {
+                                    is KeyValidationStatus.Valid -> Color(0xFF4CAF50)
+                                    is KeyValidationStatus.Invalid -> Color(0xFFEF4444)
+                                    else -> Color(0xFF4CAF50)
+                                },
+                                modifier = Modifier.size(20.dp).padding(end = 6.dp)
+                            )
+                        }
+                    }
+                }
+            )
+
+            // Empty-key quick actions: paste from clipboard + open website.
+            // These must live BELOW the text field, not inside its trailingIcon.
+            if (value.isBlank()) {
                 Spacer(modifier = Modifier.height(10.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1343,25 +1365,7 @@ if (value.isBlank()) {
                         Text("افتح الموقع", color = GoldSecondary, fontFamily = CairoFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
-            } else if (value.isNotBlank()) {
-                            Icon(
-                                imageVector = when (validationStatus) {
-                                    is KeyValidationStatus.Valid -> Icons.Default.CheckCircle
-                                    is KeyValidationStatus.Invalid -> Icons.Default.Error
-                                    else -> Icons.Default.CheckCircle
-                                },
-                                contentDescription = null,
-                                tint = when (validationStatus) {
-                                    is KeyValidationStatus.Valid -> Color(0xFF4CAF50)
-                                    is KeyValidationStatus.Invalid -> Color(0xFFEF4444)
-                                    else -> Color(0xFF4CAF50)
-                                },
-                                modifier = Modifier.size(20.dp).padding(end = 6.dp)
-                            )
-                        }
-                    }
-                }
-            )
+            }
 
             // Optional secondary field (e.g. Region)
             if (secondaryFieldLabel != null && secondaryValue != null && onSecondaryValueChange != null) {
