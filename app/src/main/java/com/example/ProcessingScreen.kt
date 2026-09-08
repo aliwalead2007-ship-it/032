@@ -152,12 +152,12 @@ fun ProcessingScreen(
                     name = a.detectedStyle.ifEmpty { "الأسلوب المستنسخ المباشر" },
                     sourceVideoPathOrUrl = "Direct",
                     analysis = "${a.dominantColors} | ${a.transitionSpeed} | ${a.typographyStyle}",
-                    visualTraits = listOf(a.dominantColors.ifEmpty { "ألوان داكنة سينمائية مع ذهبي متوهج" }),
+                    visualTraits = listOf(a.dominantColors.ifEmpty { "ألوان داكنة DeepSlate بهوية AI بنفسجية #8B5CF6 وإكسنت سيان #22D3EE" }),
                     motionTraits = listOf(
                         a.transitionSpeed.ifEmpty { "سريعة ومتوازنة" },
                         a.movementPatterns.ifEmpty { "حركة كاميرا زووم بطيء ناعم" }
                     ),
-                    textTraits = listOf(a.typographyStyle.ifEmpty { "خط كوفي عريض في المنتصف" }),
+                    textTraits = listOf(a.typographyStyle.ifEmpty { "خط عربي عريض في المنتصف" }),
                     overallScore = 98
                 )
             }
@@ -176,7 +176,7 @@ fun ProcessingScreen(
             val effectiveColors = if (effectiveStyle.visualTraits.isNotEmpty()) {
                 effectiveStyle.visualTraits.joinToString("، ")
             } else {
-                templateInfo.colors.ifBlank { "DeepSlate #0B0F19 مع لمسات ذهبية #E8C547" }
+                templateInfo.colors.ifBlank { "DeepSlate #0B0F19 مع هوية AI بنفسجية #8B5CF6 وإكسنت سيان #22D3EE" }
             }
             val effectiveTransition = effectiveStyle.resolveTransitionType()
             val effectiveTextAnim = effectiveStyle.resolveTextAnimation()

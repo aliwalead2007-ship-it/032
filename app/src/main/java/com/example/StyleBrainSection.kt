@@ -1259,6 +1259,7 @@ fun getFilterArabicLabel(filter: String): String = when (filter.lowercase()) {
     "cool_emerald" -> "زمردي عميق"
     "soft_desert" -> "صحراوي ناعم"
     "high_contrast_dark" -> "تباين داكن حاد"
+    "ai_violet" -> "بنفسجي تقني"
     else -> filter
 }
 

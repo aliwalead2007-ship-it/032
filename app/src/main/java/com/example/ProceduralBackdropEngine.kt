@@ -26,7 +26,7 @@ object ProceduralBackdropEngine {
         height: Int,
         topHex: String = "#070B14",
         bottomHex: String = "#0B0F19",
-        accentHex: String = "#E8C547",
+        accentHex: String = "#22D3EE",
         caption: String? = null,
         brandLine: String = "قبس  |  Qabas",
         footerText: String = "Offline Cinematic Frame"
@@ -40,7 +40,7 @@ object ProceduralBackdropEngine {
 
             val top = safeColor(topHex, "#070B14")
             val bottom = safeColor(bottomHex, "#0B0F19")
-            val accent = safeColor(accentHex, "#E8C547")
+            val accent = safeColor(accentHex, "#22D3EE")
 
             val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 shader = LinearGradient(0f, 0f, 0f, h.toFloat(), top, bottom, Shader.TileMode.CLAMP)

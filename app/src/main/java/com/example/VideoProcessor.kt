@@ -428,7 +428,7 @@ object VideoProcessor {
                 colors.contains("high_contrast") || colors.contains("أحمر") ->
                     Triple("#E60B0F19", "#EF4444", "#F8FAFC")
                 else ->
-                    Triple("#E60B0F19", "#E8C547", "#F8FAFC")
+                    Triple("#E60B0F19", "#8B5CF6", "#F8FAFC")
             }
 
             val baseTextSize = when {
@@ -741,12 +741,13 @@ object VideoProcessor {
             blob.contains("soft_desert") || blob.contains("صحراء") || blob.contains("desert") -> "soft_desert"
             blob.contains("cool_emerald") || blob.contains("emerald") || blob.contains("زمرد") -> "cool_emerald"
             blob.contains("high_contrast_dark") || (blob.contains("contrast") && blob.contains("dark")) -> "high_contrast_dark"
+            blob.contains("ai_violet") || blob.contains("بنفسج") || blob.contains("violet") || blob.contains("cyan") || blob.contains("سيان") -> "ai_violet"
             blob.contains("warm_gold") || blob.contains("ذهبي") || blob.contains("gold") -> "warm_gold"
             blob.contains("filter=") -> {
                 Regex("""filter\s*[=:]\s*([a-z_]+)""", RegexOption.IGNORE_CASE)
-                    .find(blob)?.groupValues?.getOrNull(1) ?: "warm_gold"
+                    .find(blob)?.groupValues?.getOrNull(1) ?: "ai_violet"
             }
-            else -> "warm_gold"
+            else -> "ai_violet"
         }
     }
 
@@ -786,6 +787,9 @@ object VideoProcessor {
             "warm_gold" ->
                 "eq=contrast=1.20:brightness=0.015:saturation=1.24:gamma=1.03," +
                 "colorchannelmixer=1.10:0.05:0.01:0:0.04:1.02:0.01:0:0.01:0.03:0.86:0"
+            "ai_violet" ->
+                "eq=contrast=1.24:brightness=-0.005:saturation=1.26:gamma=0.985," +
+                "colorchannelmixer=0.94:0.07:0.12:0:0.06:0.88:0.12:0:0.12:0.10:1.05:0"
             else ->
                 "eq=contrast=1.16:saturation=1.16:gamma=1.02"
         }

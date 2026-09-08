@@ -1330,7 +1330,7 @@ object AppServices {
                 val traits = (bestStyle.visualTraits + bestStyle.motionTraits + bestStyle.textTraits).joinToString("، ")
                 finalStyleDescription = "استخدم ميزات هذا الأسلوب المفضل من العقل: $traits. ${bestStyle.analysis}"
             } else {
-                finalStyleDescription = "العقل لم يتدرب بعد. استخدم أسلوباً حماسياً قوياً، مونتاج سريع (Jump Cuts)، ألوان داكنة مع تباين ذهبي، ونصوص عريضة ديناميكية (كابشنز متفاعلة)."
+                finalStyleDescription = "العقل لم يتدرب بعد. استخدم ألواناً داكنة بهوية AI بنفسجية #8B5CF6 وإكسنت سيان #22D3EE (DeepSlate #0B0F19)، ونصوصاً عربية عريضة ديناميكية (كابشنز متفاعلة)."
             }
         }
         return RealGeminiService.generateScript(idea, finalStyleDescription, contentType, contentTone)
@@ -1482,7 +1482,7 @@ object AppServices {
             combined.contains("برتقالي") || combined.contains("غروب") || combined.contains("orange") -> "#F97316"
             combined.contains("أزرق") || combined.contains("blue") || combined.contains("سماوي") -> "#38BDF8"
             combined.contains("أبيض") || combined.contains("white") -> "#F8FAFC"
-            else -> "#E8C547"
+            else -> "#8B5CF6"
         }
         val bgColorHex = when {
             combined.contains("أخضر") || combined.contains("emerald") -> "#0F291E"

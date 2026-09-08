@@ -617,7 +617,7 @@ class VideoEngineManager(private val context: Context) {
                 parseBlob.contains("high_contrast") ->
                     Triple("#050811", "#0B0F19", "#EF4444")
                 else ->
-                    Triple("#070B14", "#0B0F19", directivePrimary ?: "#E8C547")
+                    Triple("#070B14", "#0B0F19", directivePrimary ?: "#8B5CF6")
             }
 
             try {

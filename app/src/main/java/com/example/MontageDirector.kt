@@ -23,11 +23,11 @@ object MontageDirector {
         val transition: String,
         val motion: String,
         val tempo: String,
-        val primaryColorHex: String = "#E8C547",
+        val primaryColorHex: String = "#8B5CF6",
         val backgroundColorHex: String = "#0B0F19",
         val captionAnimation: String = "FadeIn",
         val captionPosition: String = "bottom",
-        val filterHint: String = "warm_gold"
+        val filterHint: String = "ai_violet"
     )
 
     data class EditPlan(
@@ -162,7 +162,7 @@ object MontageDirector {
         val plan = createPlan(idea, tone, targetDurationSec, audience, styleDescription, preferredStyleId)
         val directive = plan.directive
         val ofMotion = normalizeMotion(directive?.motionType ?: "slow_zoom")
-        val filter = directive?.filterHint ?: "warm_gold"
+        val filter = directive?.filterHint ?: "ai_violet"
 
         val geminiScenes = try {
             AppServices.generateScript(
@@ -309,11 +309,11 @@ object MontageDirector {
         directive: StyleDirective?,
         ofMotion: String
     ): List<ScenePlan> {
-        val primary = directive?.primaryColorHex ?: "#E8C547"
+        val primary = directive?.primaryColorHex ?: "#8B5CF6"
         val bg = directive?.backgroundColorHex ?: "#0B0F19"
         val capAnim = directive?.captionAnimation ?: "FadeIn"
         val capPos = directive?.captionPosition ?: "bottom"
-        val filter = directive?.filterHint ?: "warm_gold"
+        val filter = directive?.filterHint ?: "ai_violet"
         val boostEn = directive?.visualKeywordsEn?.take(3)?.joinToString(" ") ?: ""
         val boostAr = directive?.visualKeywordsAr?.take(2)?.joinToString(" ") ?: ""
 
@@ -337,29 +337,29 @@ object MontageDirector {
 
         val rawPlans = when (topic) {
             Topic.PRAYER -> listOf(
-                scene("hook", d1, "الصلاة… سكينة لا تُعوض", "mosque interior soft golden light peaceful cinematic", "مسجد إضاءة ذهبية خاشعة", transition),
+                scene("hook", d1, "الصلاة… سكينة لا تُعوض", "mosque interior soft violet light peaceful cinematic", "مسجد إضاءة بنفسجية خاشعة", transition),
                 scene("core", d2, shortIdea.ifBlank { "أقم الصلاة لذكره" }, "person praying silhouette peaceful mosque soft light", "مصلٍ بخشوع ضوء هادئ", "Dissolve"),
                 scene("close", d3, "فيها طمأنينة القلب", "sunset sky mosque dome peaceful islamic architecture", "قبة مسجد غروب هادئ", "Fade")
             )
             Topic.QURAN -> listOf(
-                scene("hook", d1, "آية… تلامس القلب", "open quran pages soft warm light calligraphy cinematic", "مصحف مفتوح ضوء دافئ", transition),
-                scene("core", d2, shortIdea.ifBlank { "كتاب أحكمت آياته" }, "arabic calligraphy gold ink manuscript close up", "خط عربي ذهبي مخطوطة", "Dissolve"),
+                scene("hook", d1, "آية… تلامس القلب", "open quran pages soft violet light calligraphy cinematic", "مصحف مفتوح ضوء بنفسجي هادئ", transition),
+                scene("core", d2, shortIdea.ifBlank { "كتاب أحكمت آياته" }, "arabic calligraphy violet ink manuscript close up", "خط عربي بنفسجي مخطوطة", "Dissolve"),
                 scene("close", d3, "اجعل للقرآن نصيباً من يومك", "sun rays through clouds peaceful nature islamic mood", "أشعة شمس سحب سكينة", "Fade")
             )
             Topic.SALAWAT -> listOf(
                 scene("hook", d1, "إن الله وملائكته يصلون على النبي", "prophet mosque green dome night lights cinematic", "المسجد النبوي قبة خضراء ليل", transition),
-                scene("core", d2, shortIdea.ifBlank { "صلوا عليه وسلموا تسليماً" }, "mosque illuminated night warm golden glow islamic", "مسجد أنوار ذهبية ليلية", "Dissolve"),
+                scene("core", d2, shortIdea.ifBlank { "صلوا عليه وسلموا تسليماً" }, "mosque illuminated night violet and cyan glow islamic", "مسجد أنوار بنفسجية وسيان ليلية", "Dissolve"),
                 scene("close", d3, "وبها ترتفع الدرجات", "islamic architecture lantern soft bokeh night", "فوانيس إسلامية بوكيه ليلي", "Fade")
             )
             Topic.DHIKR -> listOf(
-                scene("hook", d1, "الذكر… حياة القلوب", "prayer beads tasbih soft focus warm light", "مسبحة ضوء دافئ", transition),
+                scene("hook", d1, "الذكر… حياة القلوب", "prayer beads tasbih soft focus cool light", "مسبحة ضوء بنفسجي هادئ", transition),
                 scene("core", d2, shortIdea.ifBlank { "سبحان الله والحمد لله" }, "peaceful nature river forest soft sunlight islamic calm", "طبيعة هادئة نور لطيف", "Dissolve"),
                 scene("close", d3, "أدم الذكر تأنس الروح", "night sky stars long exposure peaceful", "سماء نجوم سكينة", "Fade")
             )
             Topic.GENERAL -> listOf(
-                scene("hook", d1, shortIdea.take(32).ifBlank { "رسالة تلامس القلوب" }, "islamic architecture golden hour cinematic wide", "عمارة إسلامية ساعة ذهبية", transition),
+                scene("hook", d1, shortIdea.take(32).ifBlank { "رسالة تلامس القلوب" }, "islamic architecture violet dusk cinematic wide", "عمارة إسلامية شفق بنفسجي", transition),
                 scene("core", d2, shortIdea.ifBlank { "محتوى هادف بنور الإيمان" }, "mosque courtyard soft daylight peaceful people silhouette", "صحن مسجد ضوء نهاري", "Dissolve"),
-                scene("close", d3, "قبس… نورٌ يُنشر", "warm light through islamic arch window cinematic", "ضوء من قوس إسلامي", "Fade")
+                scene("close", d3, "قبس… نورٌ يُنشر", "cyan light through islamic arch window cinematic", "ضوء سيان من قوس إسلامي", "Fade")
             )
         }
 

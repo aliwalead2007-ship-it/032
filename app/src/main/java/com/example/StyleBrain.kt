@@ -25,10 +25,10 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 data class VisualStylePattern(
-    val dominantColors: String = "ألوان داكنة DeepSlate #0B0F19 مع لمسات ذهبية #E8C547",
-    val primaryColorHex: String = "#E8C547",
+    val dominantColors: String = "ألوان داكنة DeepSlate #0B0F19 مع هوية AI بنفسجية #8B5CF6 وإكسنت سيان #22D3EE",
+    val primaryColorHex: String = "#8B5CF6",
     val backgroundColorHex: String = "#0B0F19",
-    val lightingAndContrast: String = "إضاءة سينمائية دافئة مع تباين عالي 1:10",
+    val lightingAndContrast: String = "إضاءة سينمائية باردة مع تباين تقني عالي 1:10",
     val visualTraits: List<String> = emptyList()
 ) {
     fun toMap(): Map<String, Any> = mapOf(
@@ -45,7 +45,7 @@ data class VisualStylePattern(
             val traits = (map["visualTraits"] as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
             return VisualStylePattern(
                 dominantColors = map["dominantColors"]?.toString() ?: "ألوان داكنة سينمائية",
-                primaryColorHex = map["primaryColorHex"]?.toString() ?: "#E8C547",
+                primaryColorHex = map["primaryColorHex"]?.toString() ?: "#8B5CF6",
                 backgroundColorHex = map["backgroundColorHex"]?.toString() ?: "#0B0F19",
                 lightingAndContrast = map["lightingAndContrast"]?.toString() ?: "تباين عالي",
                 visualTraits = traits
@@ -87,7 +87,7 @@ data class MotionRhythmPattern(
 data class ContentTonePattern(
     val tone: String = "مؤثر ووقور وهادف",
     val targetAudience: String = "الجمهور العام والشباب",
-    val typographyStyle: String = "خط عربي كوفي عريض في المنتصف مع إبراز الكلمات بالذهبي",
+    val typographyStyle: String = "خط عربي عريض في المنتصف مع إبراز الكلمات",
     val captionAnimation: String = "WordByWord",
     val textTraits: List<String> = emptyList()
 ) {
@@ -276,7 +276,7 @@ data class StyleDirective(
     val visualKeywordsEn: List<String>,
     val visualKeywordsAr: List<String>,
     val promptBoost: String,          // جملة إنجليزية قوية تُحقن في برومبت التوليد
-    val filterHint: String            // warm_gold | cool_emerald | high_contrast_dark | soft_desert
+    val filterHint: String            // warm_gold | cool_emerald | high_contrast_dark | soft_desert | ai_violet
 )
 
 data class StyleImprovementProposal(
@@ -396,7 +396,7 @@ data class AbsorbedStyle(
             joined.contains("برتقالي") || joined.contains("غروب") || joined.contains("orange") -> "#F97316"
             joined.contains("أزرق") || joined.contains("blue") || joined.contains("سماوي") -> "#38BDF8"
             joined.contains("أبيض") || joined.contains("white") || joined.contains("فضة") -> "#F8FAFC"
-            else -> "#E8C547" // Qabas Gold
+            else -> "#8B5CF6" // Qabas AI Violet
         }
     }
 
@@ -500,7 +500,7 @@ data class AbsorbedStyle(
             val m = Regex("""(?i)filter\s*[=:]\s*([a-zA-Z_]+)""").find(t)
             if (m != null) {
                 val v = m.groupValues[1].lowercase()
-                if (v in listOf("warm_gold", "cool_emerald", "high_contrast_dark", "soft_desert")) return v
+                if (v in listOf("warm_gold", "cool_emerald", "high_contrast_dark", "soft_desert", "ai_violet")) return v
             }
         }
         val joined = visualTraits.joinToString(" ").lowercase()
@@ -509,7 +509,8 @@ data class AbsorbedStyle(
             joined.contains("أخضر") || joined.contains("emerald") || joined.contains("green") -> "cool_emerald"
             joined.contains("تباين") || joined.contains("contrast") || joined.contains("أحمر") || joined.contains("dark") -> "high_contrast_dark"
             joined.contains("ذهبي") || joined.contains("gold") || joined.contains("دافئ") -> "warm_gold"
-            else -> "warm_gold"
+            joined.contains("بنفسجي") || joined.contains("violet") || joined.contains("سيان") || joined.contains("cyan") || joined.contains("#8b5cf6") -> "ai_violet"
+            else -> "ai_violet"
         }
     }
 
@@ -557,6 +558,10 @@ data class AbsorbedStyle(
             "high_contrast_dark" -> {
                 kwEn += listOf("high contrast dark background", "dramatic red accents", "cinematic shadow", "intense close-up")
                 kwAr += listOf("خلفية داكنة عالية التباين", "لمسات حمراء درامية", "ظل سينمائي")
+            }
+            "ai_violet" -> {
+                kwEn += listOf("deep slate black", "ai violet primary glow", "cyan accent light", "cinematic islamic architecture", "tech volumetric light")
+                kwAr += listOf("أسود داكن", "هالة بنفسجية تقنية", "لمسة سيان", "عمارة إسلامية سينمائية")
             }
             else -> {
                 kwEn += listOf("deep slate black", "warm gold accent light", "cinematic islamic architecture", "soft volumetric light")
