@@ -30,6 +30,79 @@ object QuranDataProvider {
     @Volatile
     private var versesMap: Map<Int, List<RawAyah>>? = null
 
+    // ذاكرة التخزين المؤقت للتفسير الميسر بمفتاح "سورة:آية"
+    @Volatile
+    private var tafsirMap: Map<String, String>? = null
+
+    /**
+     * تحميل آمن من assets للتفسير الميسر (مجمع الملك فهد) المدمج محلياً
+     * من ملف "quran/tafsir_muyassar.json". يُعاد التحميل مرة واحدة فقط.
+     */
+    fun loadTafsirFromAssets(context: Context): Boolean {
+        if (tafsirMap != null && tafsirMap!!.isNotEmpty()) {
+            return true
+        }
+        val assetPaths = listOf("quran/tafsir_muyassar.json", "tafsir_muyassar.json")
+        for (path in assetPaths) {
+            try {
+                val jsonString = context.assets.open(path).use { inputStream ->
+                    inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+                }
+                if (jsonString.isNotBlank()) {
+                    val parsed = parseTafsirJson(jsonString)
+                    if (parsed.isNotEmpty()) {
+                        tafsirMap = parsed
+                        Log.i(TAG, "Successfully loaded ${parsed.size} tafsir entries from asset: $path")
+                        return true
+                    }
+                }
+            } catch (_: java.io.FileNotFoundException) {
+                // الملف غير موجود في هذا المسار، يتم فحص المسار التالي
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed reading $path from assets: ${e.message}")
+            }
+        }
+        return false
+    }
+
+    /**
+     * تحليل مرن للـ JSON للتفسير الميسر: يقرأ مصفوفة "tafsir" ببنية
+     * {"s","a","t"} مع دعم بدائل {"surah","ayah","text"} في ملفات أخرى مستقبلاً.
+     */
+    private fun parseTafsirJson(jsonStr: String): Map<String, String> {
+        val result = LinkedHashMap<String, String>()
+        try {
+            val trimmed = jsonStr.trim()
+            if (!trimmed.startsWith("{")) return result
+            val root = JSONObject(trimmed)
+            val array = root.optJSONArray("tafsir")
+                ?: root.optJSONArray("verses")
+                ?: root.optJSONArray("ayahs")
+                ?: root.optJSONArray("data")
+            if (array != null) {
+                for (i in 0 until array.length()) {
+                    val obj = array.optJSONObject(i) ?: continue
+                    val surah = obj.optInt("surah", obj.optInt("surah_number", obj.optInt("chapter", obj.optInt("s", 0))))
+                    val ayah = obj.optInt("ayah", obj.optInt("verse", obj.optInt("ayah_number", obj.optInt("a", 0))))
+                    val text = obj.optString("text", obj.optString("arabic_tafsir", obj.optString("tafsir", obj.optString("t", ""))))
+                    if (surah > 0 && ayah > 0 && text.isNotBlank()) {
+                        result["$surah:$ayah"] = text
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing tafsir JSON: ${e.message}")
+        }
+        return result
+    }
+
+    /**
+     * استرجاع نص التفسير الميسر لآية محددة. يُرجع null عند غياب التحميل
+     * أو عدم وجود الآية في النسخة المدمجة — لا تفسير ملفّق.
+     */
+    fun getTafsirForVerse(surahId: Int, ayah: Int): String? =
+        tafsirMap?.get("$surahId:$ayah")
+
     /**
      * دالة تحميل آمنة من assets للقرآن الكريم كاملاً بالرسم العثماني.
      * تفحص المسارات المحتملة: "quran/uthmani.json" ثم "quran/quran.json"
@@ -265,9 +338,59 @@ object QuranDataProvider {
                 surahName = surahName,
                 verseNumber = ayah.ayah,
                 verseText = ayah.text,
-                tafseer = "",
+                tafseer = tafsirMap?.get("$surahId:${ayah.ayah}") ?: "",
                 tajweedNotes = ""
             )
         }
+    }
+
+    private fun getSurahName(surahId: Int): String =
+        surahs.firstOrNull { it.id == surahId }?.name ?: "سورة $surahId"
+
+    /**
+     * تطبيع النص العربي للبحث: حذف التشكيل والتطويل وألف الخنجرية،
+     * ثم توحيد الهمزات والألف المقصورة والتاء المربوطة لتزداد دقة المطابقة.
+     */
+    private fun normalizeArabicText(text: String): String =
+        text.replace(Regex("[\\u064B-\\u0652\\u0640\\u0670]"), "")
+            .replace("أ", "ا").replace("إ", "ا").replace("آ", "ا").replace("ٱ", "ا")
+            .replace("ى", "ي").replace("ة", "ه")
+
+    /**
+     * بحث نصي حقيقي في الآيات الـ 6236 المحملة من النص العثماني.
+     * يشترط 3 أحرف على الأقل، ويمرر مطابقة ثانية بفكّ «ال» التعريف
+     * (مثل «الكرسي» → «كرسيه» في آية الكرسي 2:255). تُرتب النتائج
+     * حسب السورة ثم رقم الآية. تحميل النسخة العثمانية شرط مسبق
+     * (loadFromAssets) وإلا تُرجع قائمة فارغة — لا بحث على لا شيء.
+     */
+    fun searchVerses(query: String, limit: Int = 50): List<QuranVerseDetail> {
+        val trimmed = query.trim()
+        if (trimmed.length < 3) return emptyList()
+        val map = versesMap ?: return emptyList()
+        val needle = normalizeArabicText(trimmed)
+        val strippedNeedle =
+            if (needle.length > 3 && needle.startsWith("ال")) needle.substring(2) else null
+        val results = ArrayList<QuranVerseDetail>()
+        for ((surahId, ayahs) in map) {
+            val surahName = getSurahName(surahId)
+            for (ayah in ayahs.sortedBy { it.ayah }) {
+                val hay = normalizeArabicText(ayah.text)
+                if (hay.contains(needle) || (strippedNeedle != null && hay.contains(strippedNeedle))) {
+                    results.add(
+                        QuranVerseDetail(
+                            surahNumber = surahId,
+                            surahName = surahName,
+                            verseNumber = ayah.ayah,
+                            verseText = ayah.text,
+                            tafseer = tafsirMap?.get("$surahId:${ayah.ayah}") ?: "",
+                            tajweedNotes = ""
+                        )
+                    )
+                    if (results.size >= limit) break
+                }
+            }
+            if (results.size >= limit) break
+        }
+        return results.sortedWith(compareBy({ it.surahNumber }, { it.verseNumber }))
     }
 }

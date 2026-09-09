@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -142,6 +143,7 @@ fun QuranTajweedScreen(
     // State for selected Surah in Golden Quran Reader
     var activeSurahId by remember { mutableIntStateOf(qabasPrefs.getInt("last_read_surah", 1)) }
     var isReadingMode by remember { mutableStateOf(false) }
+    var readerTargetVerseNumber by remember { mutableIntStateOf(-1) }
     var isPlayingAudio by remember { mutableStateOf(false) }
     var selectedReciter by remember { mutableStateOf(qabasPrefs.getString("selected_reciter", "الشيخ محمود خليل الحصري") ?: "الشيخ محمود خليل الحصري") }
     var selectedRiwaya by remember { mutableStateOf(qabasPrefs.getString("selected_riwaya", "حفص عن عاصم") ?: "حفص عن عاصم") } // رواية التلاوة
@@ -408,6 +410,7 @@ fun QuranTajweedScreen(
                             surah = activeSurah,
                             selectedReciter = selectedReciter,
                             isPlayingAudio = isPlayingAudio,
+                            highlightVerse = readerTargetVerseNumber,
                             onToggleAudio = {
                                 isPlayingAudio = !isPlayingAudio
                                 Toast.makeText(context, "التلاوة الصوتية عبر الإنترنت قيد التجهيز — اختر قارئك من قسم «القراء والروايات»", Toast.LENGTH_SHORT).show()
@@ -415,6 +418,7 @@ fun QuranTajweedScreen(
                             onSelectReciter = { selectedReciter = it; qabasPrefs.edit().putString("selected_reciter", it).apply() },
                             onCloseReader = {
                                 isReadingMode = false
+                                readerTargetVerseNumber = -1
                                 qabasPrefs.edit().putInt("last_read_surah", activeSurahId).apply()
                             },
                             onShowTafseer = { verse, tafseer -> showTafseerDialog = Pair(verse, tafseer) },
@@ -443,10 +447,17 @@ fun QuranTajweedScreen(
                                 onSearchChange = { searchQuery = it },
                                 onOpenSurah = { surahId ->
                                     activeSurahId = surahId
+                                    readerTargetVerseNumber = -1
                                     qabasPrefs.edit().putInt("last_read_surah", surahId).apply()
                                     isReadingMode = true
                                 },
-                                onCreateVideoFromVerse = onCreateVideoFromVerse
+                                onCreateVideoFromVerse = onCreateVideoFromVerse,
+                                onOpenVerse = { surahNumber, verseNumber ->
+                                    activeSurahId = surahNumber
+                                    qabasPrefs.edit().putInt("last_read_surah", surahNumber).apply()
+                                    readerTargetVerseNumber = verseNumber
+                                    isReadingMode = true
+                                }
                             )
                         }
                     }
@@ -578,7 +589,9 @@ fun QuranTajweedScreen(
                         )
                     }
                     Text(
-                        text = tafseer.ifEmpty { "التفسير الميسر: بيان معاني الكلمات وأسرار النزول ودلالات الإعجاز اللغوي والبياني لهذه الآية المباركة." },
+                        text = tafseer.ifEmpty {
+                            "لا يتوفر تفسير ميسر لهذه الآية في النسخة المدمجة حالياً."
+                        },
                         fontFamily = NotoSansFont,
                         fontSize = 13.sp,
                         color = TextSecondary,
@@ -604,9 +617,19 @@ fun GoldenQuranSurahListView(
     onSelectCategory: (String) -> Unit,
     onSearchChange: (String) -> Unit,
     onOpenSurah: (Int) -> Unit,
-    onCreateVideoFromVerse: (verseText: String, surahName: String, verseNumber: Int?) -> Unit
+    onCreateVideoFromVerse: (verseText: String, surahName: String, verseNumber: Int?) -> Unit,
+    onOpenVerse: (Int, Int) -> Unit
 ) {
     val categories = listOf("الكل", "مكية", "مدنية", "الأكثر تلاوة", "جزء عمّ")
+
+    val context = LocalContext.current
+    val trimmedSearch = searchQuery.trim()
+    val verseResults = remember(trimmedSearch) {
+        if (trimmedSearch.length >= 2) {
+            QuranDataProvider.loadFromAssets(context)
+            QuranDataProvider.searchVerses(trimmedSearch)
+        } else emptyList()
+    }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         // Search Box
@@ -664,7 +687,7 @@ fun GoldenQuranSurahListView(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        if (surahList.isEmpty()) {
+        if (surahList.isEmpty() && verseResults.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center
@@ -680,6 +703,82 @@ fun GoldenQuranSurahListView(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (verseResults.isNotEmpty()) {
+                    item(key = "verse_search_header") {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "نتائج البحث في الآيات ✨",
+                                color = GoldPrimary,
+                                fontFamily = CairoFont,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "انقر على آية لفتحها في المصحف مع تظليلها",
+                                color = TextSecondary,
+                                fontFamily = CairoFont,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                    items(verseResults, key = { "verse_${it.surahNumber}_${it.verseNumber}" }) { verse ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onOpenVerse(verse.surahNumber, verse.verseNumber) }
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = verse.verseText,
+                                    color = Color(0xFFFDE68A),
+                                    fontFamily = AmiriFont,
+                                    fontSize = 16.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "﴿${verse.surahName}: ${verse.verseNumber}﴾",
+                                        color = GoldPrimary,
+                                        fontFamily = CairoFont,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "فتح الآية 📖",
+                                        color = GoldSecondary,
+                                        fontFamily = CairoFont,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    if (surahList.isNotEmpty()) {
+                        item(key = "verse_search_surah_divider") {
+                            Column(modifier = Modifier.fillMaxWidth()) {
+                                HorizontalDivider(color = Color(0xFF151B2B))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = "السور المطابقة",
+                                    color = TextSecondary,
+                                    fontFamily = CairoFont,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                        }
+                    }
+                }
                 items(surahList, key = { it.id }) { surah ->
                     Card(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)),
@@ -817,7 +916,8 @@ fun GoldenMushafReaderView(
     onSelectReciter: (String) -> Unit,
     onCloseReader: () -> Unit,
     onShowTafseer: (String, String) -> Unit,
-    onCreateVideoFromVerse: (verseText: String, surahName: String, verseNumber: Int?) -> Unit
+    onCreateVideoFromVerse: (verseText: String, surahName: String, verseNumber: Int?) -> Unit,
+    highlightVerse: Int = -1
 ) {
     val context = LocalContext.current
     val qabasPrefs = remember { context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE) }
@@ -828,7 +928,20 @@ fun GoldenMushafReaderView(
     // Expanded Authentic Quran Verses for the Surah
     val versesList = remember(surah.id) {
         QuranDataProvider.loadFromAssets(context)
+        QuranDataProvider.loadTafsirFromAssets(context)
         getAuthenticVersesForSurah(surah.id, surah.name)
+    }
+
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(surah.id, versesList, highlightVerse) {
+        if (highlightVerse > 0) {
+            val verseIndex = versesList.indexOfFirst { it.verseNumber == highlightVerse }
+            if (verseIndex >= 0) {
+                val basmalaOffset = if (surah.id == 9) 0 else 1
+                listState.animateScrollToItem(verseIndex + basmalaOffset, scrollOffset = 0)
+            }
+        }
     }
 
     Column(
@@ -997,6 +1110,7 @@ fun GoldenMushafReaderView(
                 }
             } else {
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -1023,10 +1137,17 @@ fun GoldenMushafReaderView(
                         } else verseItem.verseText
 
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19).copy(alpha = 0.7f)),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (verseItem.verseNumber == highlightVerse) {
+                                    Color(0xFF1E293B).copy(alpha = 0.6f)
+                                } else {
+                                    Color(0xFF0B0F19).copy(alpha = 0.7f)
+                                }
+                            ),
                             border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (isPlayingAudio && idx == 0) GoldPrimary else Color(0xFF151B2B)
+                                if (verseItem.verseNumber == highlightVerse) 2.dp else 1.dp,
+                                if (verseItem.verseNumber == highlightVerse) GoldPrimary
+                                else if (isPlayingAudio && idx == 0) GoldPrimary else Color(0xFF151B2B)
                             ),
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier
@@ -1997,13 +2118,14 @@ fun GoldenTafsirSourcesView(
         }
         item {
             Text(
-                "مصادر تفسيرية معتمدة. عرض النصوص الكاملة قيد التجهيز — لن يُعرض أي تفسير غير موثوق المصدر.",
+                "مصادر تفسيرية معتمدة. التفسير الميسر مدمج ومتاح الآن في المصحف 📖، وبقية المصادر قيد التجهيز — لن يُعرض أي تفسير غير موثوق المصدر.",
                 color = TextSecondary,
                 fontFamily = NotoSansFont,
                 fontSize = 12.sp
             )
         }
         items(sources) { (title, author) ->
+            val isMuyassarAvailable = title.contains("الميسر")
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -2025,8 +2147,8 @@ fun GoldenTafsirSourcesView(
                 Text(author, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 11.sp)
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    "النص الكامل قيد التجهيز ⏳",
-                    color = GoldPrimary,
+                    if (isMuyassarAvailable) "مدمج ✓ متاح الآن في المصحف" else "النص الكامل قيد التجهيز ⏳",
+                    color = if (isMuyassarAvailable) Color(0xFF4ADE80) else GoldPrimary,
                     fontFamily = NotoSansFont,
                     fontSize = 11.sp
                 )
