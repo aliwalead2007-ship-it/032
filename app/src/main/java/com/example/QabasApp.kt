@@ -48,7 +48,7 @@ fun QabasApp() {
     val state by viewModel.state.collectAsState()
 
     val bottomNav = @Composable {
-        QabasBottomNavigation(
+        QabasSolarSystemNavigation(
             currentRoute = state.appState,
             onNavigate = { newState -> viewModel.updateState { copy(appState = newState) } }
         )
