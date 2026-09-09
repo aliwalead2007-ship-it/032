@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  لوجو قبس (Qabas) الاحترافي — توليد عبر Stitch MCP
+  شعلة ذهبية ثلاثية الطبقات فوق كتاب مفتوح بأجنحة + نجمة خماسية + أشعة إشعاع.
+  viewport يحاكي الأصل 500x500؛ ألوان صلبة مكدسة تحاكي التدرج الذهبي
+  (VectorDrawable لا يدعم التدرجات، والطبقات تعطي لوحة معدنية ذهبية).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="500dp"
+    android:height="500dp"
+    android:viewportWidth="500"
+    android:viewportHeight="500">
+
+    <!-- هالة توهج خلفية (دائرة ذهبية شبه شفافة) -->
+    <path
+        android:fillColor="#2EE8C547"
+        android:pathData="M250,220 m-180,0 a180,180 0,1 1,360 0 a180,180 0,1 1,-360 0" />
+
+    <!-- نجمة خماسية علوية متوهجة -->
+    <group
+        android:scaleX="0.7"
+        android:scaleY="0.7"
+        android:pivotX="250"
+        android:pivotY="75">
+        <path
+            android:fillColor="#F9E8A2"
+            android:pathData="M0,-24 L5,-7 L22,-7 L8,3 L13,20 L0,10 L-13,20 L-8,3 L-22,-7 L-5,-7 Z"
+            android:strokeColor="#D4AF37"
+            android:strokeWidth="1.5" />
+    </group>
+
+    <!-- أشعة إشعاع رفيعة -->
+    <path
+        android:strokeColor="#E5C158"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.25"
+        android:pathData="M250,200 L250,95" />
+    <path
+        android:strokeColor="#E5C158"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.25"
+        android:pathData="M250,200 L160,115" />
+    <path
+        android:strokeColor="#E5C158"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.25"
+        android:pathData="M250,200 L340,115" />
+    <path
+        android:strokeColor="#E5C158"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.25"
+        android:pathData="M250,200 L120,175" />
+    <path
+        android:strokeColor="#E5C158"
+        android:strokeWidth="1"
+        android:strokeAlpha="0.25"
+        android:pathData="M250,200 L380,175" />
+
+    <!-- الشعلة: الطبقة الخارجية (كفاف الشعلة) -->
+    <path
+        android:fillColor="#E5C158"
+        android:fillAlpha="0.95"
+        android:pathData="M250,110 C265,150 295,185 295,225 C295,260 275,285 250,295 C225,285 205,260 205,225 C205,185 235,150 250,110 Z" />
+
+    <!-- الشعلة: القلب المشع -->
+    <path
+        android:fillColor="#F9E8A2"
+        android:pathData="M250,145 C258,175 278,200 278,230 C278,252 265,270 250,278 C235,270 222,252 222,230 C222,200 242,175 250,145 Z" />
+
+    <!-- الشعلة: اللب الأبيض النقي -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.9"
+        android:pathData="M250,185 C253,205 264,218 264,236 C264,248 258,258 250,262 C242,258 236,248 236,236 C236,218 247,205 250,185 Z" />
+
+    <!-- الجانب الأيمن من الكتاب: الجناح/الصفحة العلوية -->
+    <path
+        android:fillColor="#E5C158"
+        android:pathData="M246,305 C210,300 160,285 105,250 C120,295 170,325 244,332 Z" />
+
+    <!-- الجانب الأيمن: صفحة وسطى فاتحة -->
+    <path
+        android:fillColor="#F9E8A2"
+        android:fillAlpha="0.75"
+        android:pathData="M245,318 C205,315 165,302 120,275 C140,308 185,335 244,342 Z" />
+
+    <!-- الجانب الأيمن: صفحة سفلية ذهبية داكنة -->
+    <path
+        android:fillColor="#D4AF37"
+        android:fillAlpha="0.5"
+        android:pathData="M245,330 C210,328 178,318 140,298 C160,324 198,346 244,352 Z" />
+
+    <!-- الجانب الأيسر من الكتاب: الجناح/الصفحة العلوية -->
+    <path
+        android:fillColor="#E5C158"
+        android:pathData="M254,305 C290,300 340,285 395,250 C380,295 330,325 256,332 Z" />
+
+    <!-- الجانب الأيسر: صفحة وسطى فاتحة -->
+    <path
+        android:fillColor="#F9E8A2"
+        android:fillAlpha="0.75"
+        android:pathData="M255,318 C295,315 335,302 380,275 C360,308 315,335 256,342 Z" />
+
+    <!-- الجانب الأيسر: صفحة سفلية ذهبية داكنة -->
+    <path
+        android:fillColor="#D4AF37"
+        android:fillAlpha="0.5"
+        android:pathData="M255,330 C290,328 322,318 360,298 C340,324 302,346 256,352 Z" />
+
+    <!-- عمود الكتاب الفقري + قاعدة -->
+    <path
+        android:fillColor="#F9E8A2"
+        android:pathData="M247,300 L253,300 L252,365 L248,365 Z" />
+    <path
+        android:fillColor="#F9E8A2"
+        android:pathData="M250,372 m-4,0 a4,4 0,1 1,8 0 a4,4 0,1 1,-8 0" />
+
+    <!-- دائرة زخرفية محيطية (حلقة ذهبية رفيعة) -->
+    <path
+        android:strokeColor="#E5C158"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.3"
+        android:pathData="M250,245 m-165,0 a165,165 0,1 1,330 0 a165,165 0,1 1,-330 0" />
+</vector>

@@ -249,6 +249,10 @@ fun LoginScreen(
                                 }
 
                                 if (success) {
+                                    // ضمان صفّ المستخدم في جدول Supabase users (upsert آمن) ليظهر في لوحة المطور
+                                    val externalId = CloudServices.Auth.getCurrentUserId() ?: lowerEmail
+                                    SupabaseServices.Database.ensureUser(externalId, lowerEmail, null)
+
                                     val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
                                     prefs.edit().apply {
                                         putBoolean("is_logged_in", true)

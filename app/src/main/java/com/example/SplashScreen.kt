@@ -325,8 +325,25 @@ fun SplashScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    // شعلة قبس الذهبية المتوهجة (رمزية مرسومة بسيطة بدل صورة إن توفرت)
-                    Text("✦", color = goldLight, fontSize = 42.sp, textAlign = TextAlign.Center)
+                    // شعلة قبس الذهبية — لوجو Vector احترافي (qabas_logo_pro) بانبض خفيف
+                    val flameFlicker = remember { Animatable(1f) }
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            flameFlicker.animateTo(0.92f, tween(420, easing = FastOutSlowInEasing))
+                            flameFlicker.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+                        }
+                    }
+                    Image(
+                        painter = painterResource(R.drawable.qabas_logo_pro),
+                        contentDescription = "شعار قبس",
+                        modifier = Modifier
+                            .fillMaxWidth(0.62f)
+                            .graphicsLayer {
+                                alpha = flameFlicker.value
+                                scaleX = 0.98f + 0.02f * flameFlicker.value
+                                scaleY = 0.98f + 0.02f * flameFlicker.value
+                            }
+                    )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text("قَـبَـسْ", color = goldPrimary, fontSize = 52.sp, fontFamily = AmiriFont, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(10.dp))
