@@ -1,18 +1,24 @@
 package com.example
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -24,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +44,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 
 
 enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN }
@@ -2029,9 +2039,25 @@ fun loadCrashLogs(context: Context): List<CrashLogFile> {
                     .firstOrNull { it.startsWith("Thread:") }
                     ?.removePrefix("Thread:")
                     ?.trim() ?: "غير معروف"
-                val exceptionLine = content.lineSequence()
-                    .firstOrNull { it.contains("Exception") || it.contains("Error") || it.contains("FATAL") }
-                    ?.trim().orEmpty()
+                // استخراج أول سطر "Caused by:" أو أول سطر Exception/Error بعد رأس الملف.
+                // السابق كان يلتقط سطراً داخل stack بدلاً من رأس الاستثناء.
+                val exceptionLine = run {
+                    val lines = content.lineSequence().toList()
+                    val causedBy = lines.firstOrNull { it.trim().startsWith("Caused by:") }?.trim()
+                    if (causedBy != null) {
+                        causedBy
+                    } else {
+                        val headerEnd = lines.indexOfFirst { it.startsWith("Thread:") }.let { if (it == -1) 0 else it + 1 }
+                        lines.drop(headerEnd)
+                            .firstOrNull { l ->
+                                val t = l.trim()
+                                t.startsWith("java.") || t.startsWith("kotlin.") ||
+                                t.startsWith("android.") || t.startsWith("androidx.") ||
+                                (t.contains("Exception:") || t.contains("Error:"))
+                            }
+                            ?.trim().orEmpty()
+                    }
+                }
                 CrashLogFile(
                     fileName = file.name,
                     timestampMs = file.lastModified(),
@@ -2046,6 +2072,103 @@ fun loadCrashLogs(context: Context): List<CrashLogFile> {
     }
 }
 
+/**
+ * يلتقط أول إطار فعلي من تطبيق `com.example` داخل الـ stack (تجاهل أطر Android/Kotlin/Java).
+ * يعود بنص مثل "QuranDataProvider.kt:loadTafsir" أو "غير معروف" لو لم يُعثر.
+ */
+fun firstAppFrame(fullStack: String): String {
+    return fullStack.lineSequence()
+        .firstOrNull { line ->
+            val t = line.trim()
+            t.startsWith("at com.example.") && "(:\\d+)" in t
+        }
+        ?.trim()
+        ?.removePrefix("at ")
+        ?.take(160)
+        ?: "غير معروف"
+}
+
+/**
+ * نوع مبسّط من CrashLogFile يُجمّع حسب عائلة الخطأ (NullPointerException, OOM, ...).
+ * مفيد لتجميع "أكثر 5 أخطاء تكراراً" في الواجهة.
+ */
+data class CrashGroup(val type: String, val count: Int, val latestMs: Long, val sample: CrashLogFile)
+
+fun groupCrashesByType(crashes: List<CrashLogFile>): List<CrashGroup> {
+    fun family(raw: String): String {
+        val s = raw.trim()
+        // أول كلمة/معرّف Java بين كلمات مفصولة بـ : أو قبلها
+        val regex = Regex("(java|kotlin|androidx|android|com)\\.[\\w.$]+(?:Exception|Error)")
+        val m = regex.find(s)
+        if (m != null) return m.value.substringAfterLast('.').substringBeforeLast('$')
+        // fallback: اقطع قبل أول ":" أو "("
+        val cutAt = listOf(':', '(').firstOrNull { s.contains(it) } ?: return s
+        return s.substringBefore(cutAt).trim().take(40)
+    }
+    return crashes
+        .groupBy { family(it.exceptionLine.ifBlank { "غير مصنّف" }) }
+        .map { (type, list) ->
+            CrashGroup(
+                type = type,
+                count = list.size,
+                latestMs = list.maxOf { it.timestampMs },
+                sample = list.maxByOrNull { it.timestampMs } ?: list.first()
+            )
+        }
+        .sortedWith(compareByDescending<CrashGroup> { it.count }.thenByDescending { it.latestMs })
+}
+
+fun copyToClipboard(context: Context, label: String, text: String) {
+    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+    cm?.setPrimaryClip(ClipData.newPlainText(label, text))
+    Toast.makeText(context, "📋 تم نسخ السجل إلى الحافظة", Toast.LENGTH_SHORT).show()
+}
+
+fun shareText(context: Context, subject: String, text: String) {
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    runCatching {
+        context.startActivity(Intent.createChooser(intent, "مشاركة سجل الانهيار").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
+    }.onFailure {
+        Toast.makeText(context, "تعذّر فتح المشاركة — استخدم زر النسخ بدلاً من ذلك.", Toast.LENGTH_LONG).show()
+    }
+}
+
+/** يصدر كل ملفات crash_logs إلى crash_logs_export.zip في Downloads. */
+fun exportCrashesZip(context: Context): File? {
+    return runCatching {
+        val dir = File(context.filesDir, "crash_logs")
+        val files = dir.listFiles()?.filter { it.name.startsWith("crash_") } ?: return@runCatching null
+        if (files.isEmpty()) return@runCatching null
+        @Suppress("DEPRECATION")
+        val downloads = android.os.Environment.getExternalStoragePublicDirectory(
+            android.os.Environment.DIRECTORY_DOWNLOADS
+        )
+        downloads.mkdirs()
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).format(java.util.Date())
+        val out = File(downloads, "qabas_crash_logs_$stamp.zip")
+        ZipOutputStream(out.outputStream().buffered()).use { zos ->
+            files.sortedByDescending { it.lastModified() }.forEach { f ->
+                zos.putNextEntry(ZipEntry(f.name))
+                f.inputStream().use { it.copyTo(zos) }
+                zos.closeEntry()
+            }
+        }
+        out
+    }.getOrNull()
+}
+
+/**
+ * يحاكي انهياراً اختبارياً للتحقق أن الحارس يلتقط فعلاً.
+ * يستدعي QabasCrashGuard.simulateCrash() ليُسجَّل بنفس مسار الإنتاج.
+ */
+fun simulateCrashForTesting(): Nothing = QabasCrashGuard.simulateCrash()
+
 class CrashDiagnosis(
     val why: String,
     val how: String,
@@ -2053,91 +2176,343 @@ class CrashDiagnosis(
 )
 
 fun diagnoseCrash(crash: CrashLogFile): CrashDiagnosis {
-    val full = crash.fullStack.lowercase()
+    val raw = crash.fullStack
+    val full = raw.lowercase()
     val exc = crash.exceptionLine.lowercase()
+    val topFrame = firstAppFrame(raw)
+
+    // ─── قاعدة روابط قبس الشائعة ───
+    fun codeHint(): String = when {
+        "qurandataprovider" in full -> "في QuranDataProvider.kt — قسم تحميل القرآن/التفسير"
+        "qabasbrainviewmodel" in full -> "في QabasBrainViewModel.kt — منطق الذكاء المركزي"
+        "supabaseservices" in full || "cloudservices" in full -> "في طبقة Supabase/Cloud — المزامنة السحابية"
+        "brollengine" in full -> "في BRollEngine.kt — محرك B-Roll/الخلفيات البرمجية"
+        "appselfdoctor" in full -> "في AppSelfDoctor.kt — فحوصات الصحة الذاتية"
+        "qabascrashguard" in full -> "في QabasCrashGuard.kt — حارس الانهيارات نفسه"
+        "mainactivity" in full -> "في MainActivity.kt — الجذر/التنقل"
+        "developerdashboardscreen" in full -> "في DeveloperDashboardScreen.kt — لوحة المطور"
+        "realservices" in full -> "في RealServices.kt — خدمات Gemini/AI الحقيقية"
+        "socialaccountmanager" in full -> "في SocialAccountManager.kt — حسابات التواصل"
+        "settingsscreen" in full -> "في SettingsScreen.kt — الإعدادات"
+        else -> ""
+    }
+
+    val locationHint = if (topFrame != "غير معروف") "الموقع: $topFrame" else ""
+
+    fun diag(why: String, how: String, fix: String): CrashDiagnosis =
+        CrashDiagnosis(why = why, how = how, fix = fix)
+
     return when {
-        "outofmemory" in exc || "oom" in exc || "could not allocate" in full ->
-            CrashDiagnosis(
-                why = "نفاد الذاكرة (OutOfMemory) أثناء الاستخراج أو المعالجة أو فتح فيديوهات كبيرة.",
-                how = "حدث خلال مرحلة استخراج الإطارات المفتاحية أو دمج/معالجة الفيديو أو تحميل أصول ضخمة دفعة واحدة.",
-                fix = "أغلق التطبيقات الخلفية الثقيلة، أعد تشغيل الجهاز، وجرّب فكرة أقصر؛ إن تكرر حدّث حارس الذاكرة على استخراج الإطارات (MediaMetadataRetriever) لتقليص التحجيم."
+        // ─── انهيارات الذاكرة ───
+        "outofmemoryerror" in exc || ("outofmemory" in exc && "error" in exc) || "could not allocate" in full ->
+            diag(
+                why = "نفاد الذاكرة (OutOfMemoryError) أثناء معالجة بيانات ضخمة دفعة واحدة. $locationHint",
+                how = "حدث غالباً في استخراج الإطارات، تحميل الأصول، أو دمج الفيديو. ${codeHint()} تأكد من أن المعالجة تستخدم streaming بدل listInMemory.",
+                fix = "أغلق التطبيقات الخلفية، جرّب فكرة أقصر، وإن تكرر حدّث الحارس على نقاط التحويل لـ flow/chunked بدل listOf."
             )
-        "arthenica" in full || "ffmpeg" in full || "ffmpegkit" in full ->
-            CrashDiagnosis(
-                why = "فشل محرك FFmpeg أثناء ترميز/دمج/تحويل الفيديو (صيغة غير مدعومة، نقص مساحة، أو أمر غير صالح).",
-                how = "حدث أثناء التصدير النهائي للفيديو عبر FFmpegKit (xfade/تفريغ/دمج المسارات).",
-                fix = "تحقق من المساحة الحرة، استخدم مقطعا أقصر، وأعد المحاولة؛ إن تكرر شارك الفيديو الخام والسجل الكامل من لوحة المطور (سجلات النظام)."
+
+        // ─── Coroutines ───
+        "cancellationexception" in exc ->
+            diag(
+                why = "إلغاء متوقّع من Coroutines (لن يحتاج إصلاحاً عادةً). $locationHint",
+                how = "حدث عند إغلاق شاشة/إلغاء scope بشكل طبيعي؛ Kotlin يلقيها لإيقاف الـ job.",
+                fix = "تجاهلها — ليست انهياراً فعلياً. لو ظهرت بكثرة في main thread فتحقق من Scope lifetime."
             )
-        "nullpointerexception" in exc || "nullpointer" in exc || "kotlin.null" in full ->
-            CrashDiagnosis(
-                why = "مرجع فارغ (Null) في مسار غير متوقّع داخل الكود.",
-                how = "استدعت دالة قيمة غير موجودة (كائن لم يُملأ أو ملف فُقد قبل الوصول إليه).",
-                fix = "أعد المحاولة بنفس الفكرة لإعادة إنشاء الكائنات؛ إن تكرر أرسل الستاك الكامل للمطور لاعتماد حارس فارغ في النقطة المحددة."
+
+        // ─── FFmpeg ───
+        "arthenica" in full || "ffmpegkit" in full || ("ffmpeg" in full && "rc=" in full) ->
+            diag(
+                why = "فشل FFmpegKit أثناء ترميز/دمج الفيديو. $locationHint",
+                how = "الأسباب: صيغة غير مدعومة، نقص مساحة، أو خطأ في وسائط الإدخال. ${codeHint()}",
+                fix = "تحقق من المساحة الحرة، استخدم فيديو أقصر، أعد المحاولة؛ إن تكرر أرسل السجل الكامل من لوحة المطور."
             )
+
+        // ─── NullPointerException ───
+        "nullpointerexception" in exc || "nullpointer" in exc || "kotlinnullpointer" in exc ->
+            diag(
+                why = "مرجع Null في مسار غير محصّن. $locationHint",
+                how = "استدعت دالة كائناً لم يُملأ (Lazy init فشل، أو nullable لم يُتحقق منه). ${codeHint()}",
+                fix = "أعد المحاولة لإعادة إنشاء الكائنات؛ إن تكرر أضف ?. أو ?: في النقطة المحددة وأرسل السباك للمطور."
+            )
+
+        // ─── IllegalStateException ───
+        "illegalstateexception" in exc ->
+            diag(
+                why = "حالة كائن غير صحيحة (مثلاً: استدعاء دالة قبل التهيئة). $locationHint",
+                how = "${codeHint()} استدعاء على كائن لم يكتمل إنشاؤه أو تم إغلاقه.",
+                fix = "تحقق من ترتيب التهيئة؛ إن تكرر شارك السباك — غالباً يحتاج StateFlow بدل lateinit."
+            )
+
+        // ─── IllegalArgumentException ───
+        "illegalargumentexception" in exc ->
+            diag(
+                why = "معامل غير صالح مرّ لدالة. $locationHint",
+                how = "${codeHint()} قيمة خارج النطاق المتوقع (URL خاطئ، index سالب، URI فارغ).",
+                fix = "أعد المحاولة بمدخل مختلف؛ إن تكرر شارك السباك لإضافة requireNotNull/require() حارس."
+            )
+
+        // ─── NoSuchMethod / NoClassDefFoundError ───
+        "nosuchmethoderror" in exc || "nosuchmethod" in full ->
+            diag(
+                why = "استدعاء دالة غير موجودة في وقت التشغيل (عدم تطابق إصدارات). $locationHint",
+                how = "تعارض بين ProGuard/R8 أو بين مكتبات بنسختين مختلفتين (مثلاً Coil + Compose).",
+                fix = "نظّف caches Gradle (.gradle/caches)، أعد البناء بـ clean. إن تكرر أضف keep rules في proguard-rules.pro."
+            )
+        "noclassdeffounderror" in exc || "classnotfound" in exc ->
+            diag(
+                why = "كلاس غير موجود وقت التشغيل. $locationHint",
+                how = "تعارض حزم أو dexing (multi-dex لم يُفعّل، أو proguard حذف كلاساً مطلوباً).",
+                fix = "نظّف caches وأعد البناء؛ إن تكرر فعّل multiDexEnabled وأضف قواعد ProGuard للكلاسات المعنية."
+            )
+
+        // ─── StackOverflowError ───
+        "stackoverflowerror" in exc ->
+            diag(
+                why = "تجاوز عمق الـ Stack (استدعاء ذاتي لا نهائي). $locationHint",
+                how = "${codeHint()} تكرار لا نهائي — غالباً JSON يحتوي على self-reference أو render متكرر.",
+                fix = "أعد المحاولة بمدخل أقصر/أبسط؛ إن تكرر أضف depth-limit أو tailrec."
+            )
+
+        // ─── SQLite ───
+        "sqlite" in exc || "sqlexception" in exc ->
+            diag(
+                why = "فشل قاعدة بيانات SQLite المحلية. $locationHint",
+                how = "تلف ملف DB أو قفل من عملية أخرى أو امتلاء التخزين.",
+                fix = "احذف cache التطبيق من الإعدادات، أعد التشغيل؛ إن تكرر شارك السجل."
+            )
+
+        // ─── JSON ───
+        "jsonsyntax" in full || "jsonparse" in full || "jsonexception" in exc || "org.json" in full ->
+            diag(
+                why = "استجابة JSON تالفة من خدمة AI/سحابية. $locationHint",
+                how = "Gemini/Supabase أحياناً يخرجان نصاً غير JSON أو باقتطاع. ${codeHint()}",
+                fix = "أعد المحاولة؛ إن تكرر أرسل الخام للمطور لتحصين parser."
+            )
+
+        // ─── Compose ───
+        "compose" in full && ("key" in full || "compositionlocal" in full || "infinite" in full) ->
+            diag(
+                why = "خطأ في شجرة Compose. $locationHint",
+                how = "${codeHint()} مفتاح مكرّر أو CompositionLocal مفقود أو recurse في layout.",
+                fix = "أعد فتح الشاشة المعنية؛ إن تكرر شارك السباك."
+            )
+
+        // ─── Coil / Image ───
+        "coil" in full || "imagedecoder" in full ->
+            diag(
+                why = "فشل تحميل/فك ترميز صورة. $locationHint",
+                how = "صورة تالفة، صيغة غير مدعومة، أو امتلاء الذاكرة المؤقتة.",
+                fix = "أعد المحاولة بعد مسح cache الصور؛ إن تكرر استبدلها بصيغة JPG."
+            )
+
+        // ─── Gemini / AI ───
         "gemini" in exc || "com.google.ai" in full || "generativelanguage" in full || "api key" in full ->
-            CrashDiagnosis(
-                why = "مفتاح Gemini مفقود/انتهت حصته أو استجابة النموذج غير قابلة للتحليل.",
-                how = "حدث أثناء استدعاء تحليل الفكرة أو توليد السكربت أو تطبيق الأسلوب عبر Gemini.",
-                fix = "افتح شاشة المفاتيح وتحقق من مفتاح Gemini (يبدأ بـ AIzaSy) أو أضف مفتاحا جديدا من aistudio.google.com، ثم أعد المحاولة."
+            diag(
+                why = "مفتاح Gemini مفقود/منتهٍ/مرفوض. $locationHint",
+                how = "حدث أثناء تحليل الفكرة، توليد السكربت، أو تطبيق الأسلوب. ${codeHint()}",
+                fix = "افتح الإعدادات وتحقق من المفتاح (يبدأ بـ AIzaSy)، أو أضف مفتاحاً جديداً من aistudio.google.com."
             )
+
+        // ─── شبكة ───
         "socket" in exc || "connectexception" in exc || "unknownhost" in exc || "timeout" in exc || "ssl" in exc ->
-            CrashDiagnosis(
-                why = "انقطاع الشبكة أو حجب الاتصال بالسيرفر (خارج عن التطبيق).",
-                how = "حدث أثناء جلب وسائط أو استدعاء AI أو مزامنة سحابية ولم يكتمل الرد خلال المهلة.",
-                fix = "تحقق من اتصال الإنترنت؛ التطبيق يعمل بلا مفاتيح عبر الخلفيات البرمجية والنطق المدمج، لكن الخدمات السحابية تحتاج شبكة مستقرة."
+            diag(
+                why = "انقطاع الشبكة أو حجب الاتصال. $locationHint",
+                how = "حدث أثناء جلب وسائط، استدعاء AI، أو مزامنة سحابية. ${codeHint()}",
+                fix = "تحقق من الإنترنت؛ التطبيق يعمل بدون مفاتيح عبر الخلفيات البرمجية والنطق المدمج."
             )
+
+        // ─── Pexels / Pixabay ───
         "pexels" in exc || "pixabay" in exc ->
-            CrashDiagnosis(
-                why = "فشل جلب/تحميل مقطع B-Roll من Pexels/Pixabay (مفتاح أو ترخيص أو رفض عن بُعد).",
-                how = "حدث أثناء تحميل الأصول البصرية لملء مشاهد الفيديو.",
-                fix = "تحقق من مفاتيح Pexels/Pixabay في شاشة المفاتيح أو أعد المحاولة؛ التطبيق يتحول تلقائياً للخلفية البرمجية (Procedural) كبديل مضمون."
+            diag(
+                why = "فشل جلب B-Roll من Pexels/Pixabay. $locationHint",
+                how = "مفتاح غير صالح أو رفض عن بُعد. ${codeHint()}",
+                fix = "تحقق من مفاتيح Pexels/Pixabay؛ التطبيق يتحول تلقائياً للخلفيات البرمجية."
             )
-        "jsonexception" in exc || "org.json" in full ->
-            CrashDiagnosis(
-                why = "استجابة JSON تالفة أو غير متوقعة من إحدى خدمات الذكاء الاصطناعي.",
-                how = "حدث عند قراءة مخرجات Gemini/Supabase وعدم مطابقتها للصيغة المنتظرة.",
-                fix = "أعد المحاولة (الاستجابات عشوائية أحياناً)؛ إن تكرر فعّل سجل النظام وأرسل التحليل الخام للمطور لتحصين التنسيق."
-            )
+
+        // ─── TTS ───
         "texttospeech" in exc || "azurespeech" in exc || "elevenlabs" in exc ->
-            CrashDiagnosis(
-                why = "فشل محرك توليد الصوت (نظام TTS أو مفتاح Azure/ElevenLabs).",
-                how = "حدث أثناء مرحلة التعليق الصوتي للفيديو.",
-                fix = "سيحاول التطبيق النطق المدمج تلقائياً؛ إن لم يعمل أعد التشغيل وكرر التوليد، وتأكد من تثبيت أصوات عربية على جهازك."
+            diag(
+                why = "فشل محرك توليد الصوت. $locationHint",
+                how = "${codeHint()} نقص مفتاح، انقطاع خدمة، أو عدم تثبيت أصوات محلية.",
+                fix = "سيتحول التطبيق للنطق المدمج تلقائياً؛ تأكد من تثبيت أصوات عربية على جهازك."
             )
-        "supabase" in full || "retrofit" in full ->
-            CrashDiagnosis(
-                why = "خطأ في الاتصال بطبقة Supabase السحابية أو استجابة من قاعدة البيانات.",
-                how = "حدث أثناء مزامنة المستخدمين/المشاريع/الإحصائيات الخادمية.",
-                fix = "تحقق من الاتصال؛ التطبيق يتدهور للوضع المحلي بأمان عند غياب الخادم، ويمكنك المتابعة دون سحابة."
+
+        // ─── Security ───
+        "securityexception" in exc || "permission denial" in exc ->
+            diag(
+                why = "رفض إذن من نظام Android. $locationHint",
+                how = "${codeHint()} طلب إذن (كاميرا/تخزين/مايك) قبل منحه فعلياً.",
+                fix = "منح الإذن من إعدادات الجهاز → التطبيقات → قبس → الأذونات."
             )
+
+        // ─── ClassCast ───
+        "classcastexception" in exc ->
+            diag(
+                why = "تحويل نوع غير صالح. $locationHint",
+                how = "كائن نوعه الفعلي لا يطابق النوع المُفترض — غالباً نتيجة دالة ترجع Any? بدون فحص.",
+                fix = "أعد المحاولة؛ إن تكرر شارك السباك — غالباً يحتاج safe cast أو instanceof."
+            )
+
+        // ─── ConcurrentModification ───
+        "concurrentmodification" in exc ->
+            diag(
+                why = "تعديل قائمة أثناء التكرار عليها. $locationHint",
+                how = "${codeHint()} for-loop على List تتم كتابتها من coroutine آخر في نفس الوقت.",
+                fix = "أعد المحاولة؛ إن تكرر استبدل بـ CopyOnWriteArrayList أو synchronized."
+            )
+
+        // ─── Supabase / Cloud ───
+        "supabase" in full || "retrofit" in full || "okhttp" in full ->
+            diag(
+                why = "خطأ في طبقة Supabase/Retrofit السحابية. $locationHint",
+                how = "${codeHint()} مزامنة المستخدمين/المشاريع/الإحصائيات.",
+                fix = "تحقق من الاتصال؛ التطبيق يتدهور للوضع المحلي بأمان عند غياب الخادم."
+            )
+
+        // ─── default ───
         else ->
-            CrashDiagnosis(
-                why = "استثناء غير متصنّف — حدث نادر في مسار غير محصّن.",
-                how = "انقطع التنفيذ فجأة أثناء إحدى مراحل الإنتاج على فكرة ما، وسجّله حارس الانهيارات فوراً مع الستاك الكامل.",
-                fix = "انسخ سطر الاستثناء الأول مع الستاك الكامل وأرسله للمطور لإضافة الحالة إلى محصّن QabasCrashGuard."
+            diag(
+                why = "استثناء غير مصنَّف بعد. $locationHint",
+                how = "${codeHint()} إذا ظهر متكرراً أضف قاعدة جديدة في diagnoseCrash (DeveloperDashboardScreen.kt).",
+                fix = "انسخ السباك وأرسله للمطور لتوسيع التشخيص."
             )
     }
+}
+
+/** خيط الفلتر النشط: الكل / main / worker / coroutine / غير معروف */
+private enum class CrashThreadFilter(val label: String, val match: (String) -> Boolean) {
+    ALL("الكل", { true }),
+    MAIN("main", { it.equals("main", ignoreCase = true) }),
+    WORKER("worker", { it.contains("worker", ignoreCase = true) || it.startsWith("DefaultDispatcher") || it.contains("pool") }),
+    COROUTINE("coroutine", { it.contains("DefaultDispatcher", ignoreCase = true) || it.contains("coroutine", ignoreCase = true) }),
+    UNKNOWN("غير معروف", { it.equals("غير معروف", ignoreCase = true) || it.isBlank() })
 }
 
 @Composable
 fun CrashLogsSection(context: Context) {
     var crashFiles by remember { mutableStateOf(loadCrashLogs(context)) }
+    var query by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(CrashThreadFilter.ALL) }
+    var viewMode by remember { mutableStateOf(CrashViewMode.LIST) } // LIST | GROUPS
+    var dialogCrash by remember { mutableStateOf<CrashLogFile?>(null) }
+
+    val filtered = remember(crashFiles, query, filter, viewMode) {
+        val byQuery = if (query.isBlank()) crashFiles
+        else crashFiles.filter {
+            it.fullStack.contains(query, ignoreCase = true) ||
+            it.exceptionLine.contains(query, ignoreCase = true) ||
+            it.fileName.contains(query, ignoreCase = true)
+        }
+        val byThread = byQuery.filter { filter.match(it.thread) }
+        byThread
+    }
+
+    val groups = remember(crashFiles) { groupCrashesByType(crashFiles) }
+    val lastCrashMs = crashFiles.maxOfOrNull { it.timestampMs } ?: 0L
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("سجل الانهيارات (${crashFiles.size})", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Row {
-                TextButton(onClick = { crashFiles = loadCrashLogs(context) }) {
-                    Text("تحديث", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 12.sp)
-                }
-                TextButton(onClick = {
+
+        // ─── شريط الملخص العلوي ───
+        SummaryStrip(
+            total = crashFiles.size,
+            types = groups.size,
+            lastMs = lastCrashMs
+        )
+
+        // ─── شريط الأدوات: وضع العرض / بحث / فلتر خيط / تصدير / مسح / محاكاة ───
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("سجل الانهيارات", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            TextButton(onClick = { crashFiles = loadCrashLogs(context) }) {
+                Text("تحديث", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 12.sp)
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilterChip(
+                selected = viewMode == CrashViewMode.LIST,
+                onClick = { viewMode = CrashViewMode.LIST },
+                label = { Text("قائمة ${crashFiles.size}", fontFamily = NotoSansFont, fontSize = 11.sp) }
+            )
+            FilterChip(
+                selected = viewMode == CrashViewMode.GROUPS,
+                onClick = { viewMode = CrashViewMode.GROUPS },
+                label = { Text("تجميع ${groups.size}", fontFamily = NotoSansFont, fontSize = 11.sp) }
+            )
+            CrashThreadFilter.values().forEach { f ->
+                FilterChip(
+                    selected = filter == f,
+                    onClick = { filter = f },
+                    label = { Text(f.label, fontFamily = NotoSansFont, fontSize = 11.sp) }
+                )
+            }
+        }
+
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            placeholder = { Text("بحث في السباك (مثل: QuranDataProvider أو NullPointerException)", fontFamily = NotoSansFont, fontSize = 12.sp, color = Color.Gray) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GoldPrimary) },
+            trailingIcon = if (query.isNotEmpty()) {
+                { IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, contentDescription = "مسح البحث", tint = Color.Gray) } }
+            } else null,
+            singleLine = true,
+            textStyle = androidx.compose.ui.text.TextStyle(color = Color.White, fontFamily = NotoSansFont, fontSize = 13.sp),
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = GoldPrimary,
+                unfocusedBorderColor = Color(0xFF1E293B),
+                cursorColor = GoldPrimary,
+                focusedContainerColor = Color(0xFF0F1629),
+                unfocusedContainerColor = Color(0xFF0F1629)
+            )
+        )
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = {
+                    val zip = exportCrashesZip(context)
+                    if (zip != null) Toast.makeText(context, "📦 تم التصدير إلى:\n${zip.absolutePath}", Toast.LENGTH_LONG).show()
+                    else Toast.makeText(context, "لا توجد ملفات لتصديرها.", Toast.LENGTH_SHORT).show()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E7490)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.Archive, contentDescription = null, tint = Color.White)
+                Spacer(Modifier.width(6.dp))
+                Text("تصدير ZIP", color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp)
+            }
+            Button(
+                onClick = {
                     runCatching {
                         File(context.filesDir, "crash_logs").listFiles()?.forEach { it.delete() }
                     }
                     crashFiles = emptyList()
-                }) {
-                    Text("مسح الكل", color = Color.Red, fontFamily = NotoSansFont, fontSize = 12.sp)
-                }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7F1D1D).copy(alpha = 0.7f)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.DeleteSweep, contentDescription = null, tint = Color.White)
+                Spacer(Modifier.width(6.dp))
+                Text("مسح الكل", color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp)
+            }
+            Button(
+                onClick = {
+                    // محاكاة انهيار اختباري — يلتقطه الحارس فوراً ويعرض بطاقة جديدة
+                    simulateCrashForTesting()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C2D12)),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(Icons.Default.BugReport, contentDescription = null, tint = Color.White)
+                Spacer(Modifier.width(6.dp))
+                Text("محاكاة", color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp)
             }
         }
 
@@ -2146,75 +2521,206 @@ fun CrashLogsSection(context: Context) {
                 .fillMaxSize()
                 .background(CardSurface, RoundedCornerShape(12.dp))
                 .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(12.dp))
-                .padding(16.dp)
+                .padding(12.dp)
         ) {
             if (crashFiles.isEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(4.dp)) {
                     Text("لا توجد انهيارات مسجَّلة 🎉", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 15.sp)
                     Text(
-                        "كل انهيار مستقبلي يُسجَّل هنا تلقائياً عبر QabasCrashGuard مع تشخيص «لماذا/كيف/الحل»، وفي حالة انهيار الواجهة يُعاد إطلاق التطبيق تلقائياً.",
+                        "كل انهيار مستقبلي يُسجَّل هنا تلقائياً عبر QabasCrashGuard مع تشخيص «لماذا/كيف/الحل». انقر «محاكاة» لاختبار الحارس فوراً.",
                         color = Color.Gray.copy(alpha = 0.7f),
                         fontFamily = NotoSansFont,
                         fontSize = 12.sp
                     )
                 }
+            } else if (filtered.isEmpty()) {
+                Text("لا توجد نتائج تطابق البحث/الفلتر.", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 13.sp, modifier = Modifier.padding(4.dp))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(crashFiles) { crash ->
-                        val diag = remember(crash.fileName) { diagnoseCrash(crash) }
-                        var expanded by remember(crash.fileName) { mutableStateOf(false) }
-                        val stamp = runCatching {
-                            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
-                                .format(java.util.Date(crash.timestampMs))
-                        }.getOrElse { crash.fileName }
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(Color(0xFF0F1629), RoundedCornerShape(10.dp))
-                                .border(1.dp, Color(0xFF232D47), RoundedCornerShape(10.dp))
-                                .clickable { expanded = !expanded }
-                                .padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🛡️", fontSize = 16.sp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("انهيار ${crash.fileName}", color = Color.White, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                                Text(stamp, color = Color.Gray, fontFamily = NotoSansFont, fontSize = 11.sp)
-                            }
-                            Text(
-                                text = crash.exceptionLine.ifBlank { "لم يُلتقط سطر استثناء واضح — افحص الستاك الكامل." },
-                                color = Color(0xFFF87171),
-                                fontFamily = CairoFont,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 12.sp,
-                                maxLines = 2,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                when (viewMode) {
+                    CrashViewMode.LIST -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(filtered) { crash ->
+                            CrashCard(
+                                crash = crash,
+                                onOpenStack = { dialogCrash = crash }
                             )
-
-                            if (expanded) {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    DiagnosisRow("لماذا ‽", diag.why, Color(0xFFFB7185))
-                                    DiagnosisRow("كيف حدث؟", diag.how, Color(0xFFFBBF24))
-                                    DiagnosisRow("الحل ✓", diag.fix, Color(0xFF34D399))
-                                    Text("الخيط: ${crash.thread}", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 11.sp)
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text("اضغط لعرض السجل كاملاً ▾", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 11.sp)
-                                }
-                            } else {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("اضغط للتفاصيل • لماذا ‽ كيف ♪ الحل ✓", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 11.sp)
-                                    Spacer(modifier = Modifier.weight(1f))
-                                    Text(if (expanded) "▴" else "▾", color = Color(0xFF22D3EE), fontSize = 12.sp)
-                                }
-                            }
+                        }
+                    }
+                    CrashViewMode.GROUPS -> LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(groups) { group ->
+                            CrashGroupCard(group = group, onOpenSample = { dialogCrash = group.sample })
                         }
                     }
                 }
             }
         }
     }
+
+    // ─── Modal السباك الكامل ───
+    dialogCrash?.let { crash ->
+        CrashStackDialog(
+            crash = crash,
+            onDismiss = { dialogCrash = null },
+            onCopy = { copyToClipboard(context, "Qabas Crash ${crash.fileName}", crash.fullStack) },
+            onShare = { shareText(context, "Qabas Crash ${crash.fileName}", crash.fullStack) }
+        )
+    }
+}
+
+private enum class CrashViewMode { LIST, GROUPS }
+
+@Composable
+private fun SummaryStrip(total: Int, types: Int, lastMs: Long) {
+    val lastText = if (lastMs > 0L) {
+        val mins = (System.currentTimeMillis() - lastMs) / 60_000
+        when {
+            mins < 1 -> "الآن"
+            mins < 60 -> "قبل ${mins} د"
+            mins < 1440 -> "قبل ${mins / 60} س"
+            else -> "قبل ${mins / 1440} يوم"
+        }
+    } else "—"
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0F1629), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(10.dp))
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        StatPill("إجمالي", total.toString(), GoldPrimary)
+        StatPill("أنواع", types.toString(), Color(0xFF22D3EE))
+        StatPill("آخر انهيار", lastText, Color(0xFFF87171))
+    }
+}
+
+@Composable
+private fun StatPill(label: String, value: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = color, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(label, color = Color.Gray, fontFamily = NotoSansFont, fontSize = 10.sp)
+    }
+}
+
+@Composable
+private fun CrashCard(crash: CrashLogFile, onOpenStack: () -> Unit) {
+    val diag = remember(crash.fileName) { diagnoseCrash(crash) }
+    val stamp = remember(crash.timestampMs) {
+        runCatching {
+            java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                .format(java.util.Date(crash.timestampMs))
+        }.getOrElse { crash.fileName }
+    }
+    val topFrame = remember(crash.fullStack) { firstAppFrame(crash.fullStack) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0F1629), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFF232D47), RoundedCornerShape(10.dp))
+            .clickable { onOpenStack() }
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("🛡️", fontSize = 16.sp)
+            Spacer(modifier = Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = crash.exceptionLine.ifBlank { "غير مصنَّف" }.take(140),
+                    color = Color(0xFFF87171),
+                    fontFamily = CairoFont,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.sp,
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text("📍 $topFrame", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 11.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            Text(stamp, color = Color.Gray, fontFamily = NotoSansFont, fontSize = 10.sp)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DiagnosisRow("لماذا ‽", diag.why, Color(0xFFFB7185))
+            DiagnosisRow("الحل ✓", diag.fix, Color(0xFF34D399))
+        }
+        Text(
+            "🛈 اضغط لفتح السباك الكامل • نسخ • مشاركة",
+            color = Color(0xFF22D3EE),
+            fontFamily = NotoSansFont,
+            fontSize = 10.sp
+        )
+    }
+}
+
+@Composable
+private fun CrashGroupCard(group: CrashGroup, onOpenSample: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0F1629), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFF232D47), RoundedCornerShape(10.dp))
+            .clickable { onOpenSample() }
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("📦 ${group.type}", color = Color.White, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Surface(color = Color(0xFFF87171), shape = RoundedCornerShape(6.dp)) {
+                Text("× ${group.count}", color = Color.White, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+            }
+        }
+        Text("آخر ظهور: ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date(group.latestMs))}", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 10.sp)
+        Text("📍 ${firstAppFrame(group.sample.fullStack)}", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun CrashStackDialog(crash: CrashLogFile, onDismiss: () -> Unit, onCopy: () -> Unit, onShare: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text("سباك الانهيار", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(crash.fileName, color = Color.Gray, fontFamily = NotoSansFont, fontSize = 10.sp)
+            }
+        },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "📍 ${firstAppFrame(crash.fullStack)}",
+                    color = Color(0xFF22D3EE),
+                    fontFamily = NotoSansFont,
+                    fontSize = 11.sp
+                )
+                Spacer(Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF050B17), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFF1E293B), RoundedCornerShape(8.dp))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        text = crash.fullStack.ifBlank { "(ملف فارغ)" },
+                        color = Color(0xFFE2E8F0),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                TextButton(onClick = onCopy) { Text("📋 نسخ", color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 12.sp) }
+                TextButton(onClick = onShare) { Text("📤 مشاركة", color = Color(0xFF22D3EE), fontFamily = NotoSansFont, fontSize = 12.sp) }
+                TextButton(onClick = onDismiss) { Text("إغلاق", color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp) }
+            }
+        },
+        containerColor = Color(0xFF0F1629),
+        titleContentColor = Color.White,
+        textContentColor = Color.White
+    )
 }
 
 @Composable
