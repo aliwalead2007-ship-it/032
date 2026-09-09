@@ -133,15 +133,19 @@ fun QuranTajweedScreen(
         }
     }
 
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: المصحف الذهبي, 1: المراحل والاختبار, 2: فحص التلاوة بالذكاء الاصطناعي, 3: موسوعة التجويد
+    // المصحف الذهبي Hub: أقسام رئيسية (المصحف / القراء والروايات / التفسير والمصادر / الأذكار / أكاديمية التجويد)
+    val qabasPrefs = remember { context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE) }
+    var quranSection by remember { mutableIntStateOf(0) } // 0: المصحف الشريف, 1: القراء والروايات, 2: التفسير والمصادر, 3: الأذكار, 4: أكاديمية التجويد
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilterCategory by remember { mutableStateOf("الكل") } // الكل، مكية، مدنية، الأكثر تلاوة، جزء عمّ
 
     // State for selected Surah in Golden Quran Reader
-    var activeSurahId by remember { mutableIntStateOf(1) }
+    var activeSurahId by remember { mutableIntStateOf(qabasPrefs.getInt("last_read_surah", 1)) }
     var isReadingMode by remember { mutableStateOf(false) }
     var isPlayingAudio by remember { mutableStateOf(false) }
-    var selectedReciter by remember { mutableStateOf("الشيخ محمد صديق المنشاوي") }
+    var selectedReciter by remember { mutableStateOf(qabasPrefs.getString("selected_reciter", "الشيخ محمود خليل الحصري") ?: "الشيخ محمود خليل الحصري") }
+    var selectedRiwaya by remember { mutableStateOf(qabasPrefs.getString("selected_riwaya", "حفص عن عاصم") ?: "حفص عن عاصم") } // رواية التلاوة
+    var academySubTab by remember { mutableIntStateOf(0) } // داخل الأكاديمية: 0 المراحل, 1 اختبار الصوت, 2 الموسوعة
     var showTafseerDialog by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     // Full 114 Surahs provided by QuranDataProvider
@@ -360,38 +364,43 @@ fun QuranTajweedScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Navigation Sub-Tabs
+            // شريط أقسام المصحف الذهبي (Hub)
             ScrollableTabRow(
-                selectedTabIndex = selectedTab,
+                selectedTabIndex = quranSection,
                 containerColor = Color(0xFF0B0F19),
                 contentColor = GoldPrimary,
                 edgePadding = 12.dp
             ) {
                 Tab(
-                    selected = selectedTab == 0,
-                    onClick = { selectedTab = 0; isReadingMode = false },
-                    text = { Text("المصحف الذهبي 📜", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
+                    selected = quranSection == 0,
+                    onClick = { quranSection = 0; isReadingMode = false; showTafseerDialog = null },
+                    text = { Text("المصحف الشريف 📖", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
-                    selected = selectedTab == 1,
-                    onClick = { selectedTab = 1; isReadingMode = false },
-                    text = { Text("أكاديمية التجويد والمراحل 🎯", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
+                    selected = quranSection == 1,
+                    onClick = { quranSection = 1; isReadingMode = false; showTafseerDialog = null },
+                    text = { Text("القراء والروايات 🎙️", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2; isReadingMode = false },
-                    text = { Text("اختبار التلاوة بالصوت 🎙️", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
+                    selected = quranSection == 2,
+                    onClick = { quranSection = 2; isReadingMode = false; showTafseerDialog = null },
+                    text = { Text("التفسير والمصادر 📚", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3; isReadingMode = false },
-                    text = { Text("موسوعة الأحكام 📚", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
+                    selected = quranSection == 3,
+                    onClick = { quranSection = 3; isReadingMode = false; showTafseerDialog = null },
+                    text = { Text("الأذكار 🤲", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
+                )
+                Tab(
+                    selected = quranSection == 4,
+                    onClick = { quranSection = 4; isReadingMode = false; showTafseerDialog = null },
+                    text = { Text("أكاديمية التجويد 🎓", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            when (selectedTab) {
+            when (quranSection) {
                 0 -> {
                     if (isReadingMode) {
                         val activeSurah = surahList.find { it.id == activeSurahId } ?: surahList[0]
@@ -399,80 +408,142 @@ fun QuranTajweedScreen(
                             surah = activeSurah,
                             selectedReciter = selectedReciter,
                             isPlayingAudio = isPlayingAudio,
-                            onToggleAudio = { isPlayingAudio = !isPlayingAudio },
-                            onSelectReciter = { selectedReciter = it },
-                            onCloseReader = { isReadingMode = false },
+                            onToggleAudio = {
+                                isPlayingAudio = !isPlayingAudio
+                                Toast.makeText(context, "التلاوة الصوتية عبر الإنترنت قيد التجهيز — اختر قارئك من قسم «القراء والروايات»", Toast.LENGTH_SHORT).show()
+                            },
+                            onSelectReciter = { selectedReciter = it; qabasPrefs.edit().putString("selected_reciter", it).apply() },
+                            onCloseReader = {
+                                isReadingMode = false
+                                qabasPrefs.edit().putInt("last_read_surah", activeSurahId).apply()
+                            },
                             onShowTafseer = { verse, tafseer -> showTafseerDialog = Pair(verse, tafseer) },
                             onCreateVideoFromVerse = onCreateVideoFromVerse
                         )
                     } else {
-                        GoldenQuranSurahListView(
-                            surahList = filteredSurahs,
-                            searchQuery = searchQuery,
-                            selectedCategory = selectedFilterCategory,
-                            onSelectCategory = { selectedFilterCategory = it },
-                            onSearchChange = { searchQuery = it },
-                            onOpenSurah = { surahId ->
-                                activeSurahId = surahId
-                                isReadingMode = true
-                            },
-                            onCreateVideoFromVerse = onCreateVideoFromVerse
-                        )
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            val lastReadSurah = surahList.find { it.id == activeSurahId }
+                            if (lastReadSurah != null) {
+                                GoldenContinueReadingCard(
+                                    surah = lastReadSurah,
+                                    selectedReciter = selectedReciter,
+                                    onResume = { isReadingMode = true },
+                                    onClear = {
+                                        qabasPrefs.edit().remove("last_read_surah").apply()
+                                        activeSurahId = 1
+                                    }
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                            }
+                            GoldenQuranSurahListView(
+                                surahList = filteredSurahs,
+                                searchQuery = searchQuery,
+                                selectedCategory = selectedFilterCategory,
+                                onSelectCategory = { selectedFilterCategory = it },
+                                onSearchChange = { searchQuery = it },
+                                onOpenSurah = { surahId ->
+                                    activeSurahId = surahId
+                                    qabasPrefs.edit().putInt("last_read_surah", surahId).apply()
+                                    isReadingMode = true
+                                },
+                                onCreateVideoFromVerse = onCreateVideoFromVerse
+                            )
+                        }
                     }
                 }
-                1 -> TajweedAcademyStagesView(
-                    surahList = surahList,
-                    onStartTest = { surahId ->
-                        activeSurahId = surahId
-                        selectedTab = 2
-                    }
+                1 -> GoldenQuranRecitersView(
+                    selectedReciter = selectedReciter,
+                    onSelectReciter = { selectedReciter = it; qabasPrefs.edit().putString("selected_reciter", it).apply() },
+                    selectedRiwaya = selectedRiwaya,
+                    onSelectRiwaya = { selectedRiwaya = it; qabasPrefs.edit().putString("selected_riwaya", it).apply() }
                 )
-                2 -> AiVoiceRecitationTestView(
-                    activeSurahName = surahList.find { it.id == activeSurahId }?.name ?: "الفاتحة",
-                    isRecording = isRecordingRecitation,
-                    isAnalyzing = isAnalyzingVoice,
-                    testScore = lastTestScore,
-                    feedbackList = testFeedbackList,
-                    isPlayingAudio = isPlayingRecordedAudio,
-                    hasRecordedAudio = recorderHelper.outputFile?.let { it.exists() && it.length() > 0 } ?: false,
-                    onPlayRecordedAudio = {
-                        if (isPlayingRecordedAudio) {
-                            recorderHelper.stopPlayback()
-                            isPlayingRecordedAudio = false
-                        } else {
-                            isPlayingRecordedAudio = true
-                            val started = recorderHelper.startPlayback {
-                                isPlayingRecordedAudio = false
-                            }
-                            if (!started) {
-                                isPlayingRecordedAudio = false
-                                Toast.makeText(context, "تعذر تشغيل التسجيل الصوتي", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
-                    onStartRecording = {
-                        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    },
-                    onStopRecordingAndAnalyze = {
-                        isRecordingRecitation = false
-                        val file = recorderHelper.stopRecording()
-                        isAnalyzingVoice = true
-
-                        val fileSizeKb = (file?.length() ?: 0L) / 1024
-
-                        scope.launch {
-                            delay(1200)
-                            isAnalyzingVoice = false
-                            lastTestScore = 0
-                            testFeedbackList = listOf(
-                                "تم حفظ التسجيل الصوتي بنجاح (${fileSizeKb} KB)" to true,
-                                "تحليل التجويد الحقيقي يتطلب محرك صوت متخصص (قيد التطوير)" to false
+                2 -> GoldenTafsirSourcesView(
+                    onBackToMushaf = { quranSection = 0 }
+                )
+                3 -> GoldenAdhkarView()
+                4 -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        ScrollableTabRow(
+                            selectedTabIndex = academySubTab,
+                            containerColor = Color(0xFF0B0F19),
+                            contentColor = GoldPrimary,
+                            edgePadding = 12.dp
+                        ) {
+                            Tab(
+                                selected = academySubTab == 0,
+                                onClick = { academySubTab = 0 },
+                                text = { Text("المراحل 🎯", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                             )
-                            Toast.makeText(context, "تم حفظ التسجيل. تحليل التجويد الحقيقي يتطلب محرك صوت متخصص (قيد التطوير).", Toast.LENGTH_LONG).show()
+                            Tab(
+                                selected = academySubTab == 1,
+                                onClick = { academySubTab = 1 },
+                                text = { Text("اختبار التلاوة 🎙️", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
+                            )
+                            Tab(
+                                selected = academySubTab == 2,
+                                onClick = { academySubTab = 2 },
+                                text = { Text("موسوعة الأحكام 📚", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        when (academySubTab) {
+                            0 -> TajweedAcademyStagesView(
+                                surahList = surahList,
+                                onStartTest = { surahId ->
+                                    activeSurahId = surahId
+                                    qabasPrefs.edit().putInt("last_read_surah", surahId).apply()
+                                    academySubTab = 1
+                                }
+                            )
+                            1 -> AiVoiceRecitationTestView(
+                                activeSurahName = surahList.find { it.id == activeSurahId }?.name ?: "الفاتحة",
+                                isRecording = isRecordingRecitation,
+                                isAnalyzing = isAnalyzingVoice,
+                                testScore = lastTestScore,
+                                feedbackList = testFeedbackList,
+                                isPlayingAudio = isPlayingRecordedAudio,
+                                hasRecordedAudio = recorderHelper.outputFile?.let { it.exists() && it.length() > 0 } ?: false,
+                                onPlayRecordedAudio = {
+                                    if (isPlayingRecordedAudio) {
+                                        recorderHelper.stopPlayback()
+                                        isPlayingRecordedAudio = false
+                                    } else {
+                                        isPlayingRecordedAudio = true
+                                        val started = recorderHelper.startPlayback {
+                                            isPlayingRecordedAudio = false
+                                        }
+                                        if (!started) {
+                                            isPlayingRecordedAudio = false
+                                            Toast.makeText(context, "تعذر تشغيل التسجيل الصوتي", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                onStartRecording = {
+                                    micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                },
+                                onStopRecordingAndAnalyze = {
+                                    isRecordingRecitation = false
+                                    val file = recorderHelper.stopRecording()
+                                    isAnalyzingVoice = true
+
+                                    val fileSizeKb = (file?.length() ?: 0L) / 1024
+
+                                    scope.launch {
+                                        delay(1200)
+                                        isAnalyzingVoice = false
+                                        lastTestScore = 0
+                                        testFeedbackList = listOf(
+                                            "تم حفظ التسجيل الصوتي بنجاح (${fileSizeKb} KB)" to true,
+                                            "تحليل التجويد الحقيقي يتطلب محرك صوت متخصص (قيد التطوير)" to false
+                                        )
+                                        Toast.makeText(context, "تم حفظ التسجيل. تحليل التجويد الحقيقي يتطلب محرك صوت متخصص (قيد التطوير).", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                            )
+                            2 -> TajweedRulesEncyclopediaView(rules = tajweedRulesList)
                         }
                     }
-                )
-                3 -> TajweedRulesEncyclopediaView(rules = tajweedRulesList)
+                }
             }
         }
     }
@@ -749,9 +820,10 @@ fun GoldenMushafReaderView(
     onCreateVideoFromVerse: (verseText: String, surahName: String, verseNumber: Int?) -> Unit
 ) {
     val context = LocalContext.current
+    val qabasPrefs = remember { context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE) }
     var isTajweedColored by remember { mutableStateOf(true) }
     var isMemorizationMode by remember { mutableStateOf(false) }
-    var isBookmarked by remember { mutableStateOf(false) }
+    var isBookmarked by remember { mutableStateOf(qabasPrefs.getBoolean("bookmarked_surah_${surah.id}", false)) }
 
     // Expanded Authentic Quran Verses for the Surah
     val versesList = remember(surah.id) {
@@ -795,6 +867,7 @@ fun GoldenMushafReaderView(
             Row {
                 IconButton(onClick = {
                     isBookmarked = !isBookmarked
+                    qabasPrefs.edit().putBoolean("bookmarked_surah_${surah.id}", isBookmarked).apply()
                     Toast.makeText(context, if (isBookmarked) "تم وضع علامة الفاصل القرآني 🔖" else "تم إزالة العلامة", Toast.LENGTH_SHORT).show()
                 }) {
                     Icon(
@@ -1705,6 +1778,368 @@ fun TajweedRulesEncyclopediaView(
             items(filteredRules) { rule ->
                 TajweedRuleCard(rule = rule)
             }
+        }
+    }
+}
+
+// ============ المصحف الذهبي Hub — الأقسام الجديدة ============
+
+// بطاقة «متابعة القراءة» في رأس قسم المصحف
+@Composable
+fun GoldenContinueReadingCard(
+    surah: QuranSurahItem,
+    selectedReciter: String,
+    onResume: () -> Unit,
+    onClear: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF151B2B), RoundedCornerShape(14.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(GoldPrimary.copy(alpha = 0.15f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("📖", fontSize = 18.sp)
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "متابعة القراءة",
+                color = GoldPrimary,
+                fontFamily = CairoFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
+            Text(
+                "سورة ${surah.name} • ${surah.type} • ${surah.versesCount} آية • ${selectedReciter}",
+                color = TextSecondary,
+                fontFamily = NotoSansFont,
+                fontSize = 11.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        TextButton(onClick = onResume) {
+            Text("واصل ▶", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+        }
+        IconButton(onClick = onClear, modifier = Modifier.size(32.dp)) {
+            Text("✕", color = TextSecondary, fontSize = 12.sp)
+        }
+    }
+}
+
+// قسم القراء والروايات
+@Composable
+fun GoldenQuranRecitersView(
+    selectedReciter: String,
+    onSelectReciter: (String) -> Unit,
+    selectedRiwaya: String,
+    onSelectRiwaya: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val qabasPrefs = remember { context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE) }
+    val reciters = listOf(
+        "الشيخ محمود خليل الحصري" to "شيخ عموم المقارئ المصرية سابقاً — مرتّل ومجوّد",
+        "الشيخ محمد صديق المنشاوي" to "تلاوة مرتّلة بأداء خاشع رفيع",
+        "الشيخ عبد الباسط عبد الصمد" to "مرتّل ومجوّد من أعلام القراءة في القرن العشرين",
+        "الشيخ مصطفى إسماعيل" to "تلاوة مجوّدة بنَفَسٍ وأداء فريد",
+        "الشيخ محمود علي البنا" to "مرتّل مصري مشهور بإيقاعه المؤثر",
+        "الشيخ محمد رفعت" to "من أشهر قرّاء جيله بحلاوة صوت نادرة",
+        "الشيخ ماهر المعيقلي" to "إمام وخطيب المسجد الحرام — مرتّل",
+        "الشيخ مشاري راشد العفاسي" to "قارئ كويتي معروف بمرتّل المؤثرات",
+        "الشيخ عبد الرحمن السديس" to "إمام وخطيب المسجد الحرام — مرتّل",
+        "الشيخ سعود الشريم" to "إمام وخطيب المسجد الحرام — مرتّل",
+        "الشيخ ياسر الدوسري" to "إمام المسجد الحرام — مرتّل",
+        "الشيخ إسلام صبحي" to "قارئ مصري شاب صاحب تلاوات منتشرة"
+    )
+    val riwayat = listOf(
+        "حفص عن عاصم",
+        "ورش عن نافع",
+        "قالون عن نافع",
+        "شعبة عن عاصم",
+        "الدوري عن أبي عمرو",
+        "السوسي عن أبي عمرو",
+        "خلف عن حمزة",
+        "خلاد عن حمزة",
+        "أبو جعفر (قراءة)",
+        "يعقوب الحضرمي (قراءة)"
+    )
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Text(
+                "اختر قارئك 🎙️",
+                color = GoldPrimary,
+                fontFamily = AmiriFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        }
+        item {
+            Text(
+                "يُحفظ اختيارك محلياً ويُستخدم في واجهة القارئ. التلاوة الصوتية (الاستماع) عبر الإنترنت قيد التجهيز وستربط بسجلات القرّاء الموثوقة فقط.",
+                color = TextSecondary,
+                fontFamily = NotoSansFont,
+                fontSize = 12.sp
+            )
+        }
+        item { Text("القرّاء", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+        items(reciters) { (name, bio) ->
+            val isSelected = selectedReciter == name
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (isSelected) Color(0xFF1B2436) else Color(0xFF151B2B))
+                    .border(
+                        width = if (isSelected) 1.dp else 0.dp,
+                        color = GoldPrimary,
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    .clickable { onSelectReciter(name); qabasPrefs.edit().putString("selected_reciter", name).apply() }
+                    .padding(12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (isSelected) "⭐ " else "🎙️ ", fontSize = 14.sp)
+                    Text(
+                        name,
+                        color = if (isSelected) GoldPrimary else TextPrimary,
+                        fontFamily = CairoFont,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (isSelected) Text("✓", color = GoldPrimary, fontSize = 14.sp)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(bio, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 11.sp)
+            }
+        }
+        item { Spacer(modifier = Modifier.height(4.dp)) }
+        item { Text("الروايات", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+        item {
+            Text(
+                "الرواية تحدد أسلوب النطق في التلاوة؛ تُحفظ مع اختيارك وتُستخدم عند توفر التلاوة الصوتية.",
+                color = TextSecondary,
+                fontFamily = NotoSansFont,
+                fontSize = 11.sp
+            )
+        }
+        items(riwayat) { riwaya ->
+            val isSelected = selectedRiwaya == riwaya
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (isSelected) Color(0xFF1B2436) else Color(0xFF151B2B))
+                    .border(
+                        width = if (isSelected) 1.dp else 0.dp,
+                        color = GoldPrimary,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    .clickable { onSelectRiwaya(riwaya); qabasPrefs.edit().putString("selected_riwaya", riwaya).apply() }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    riwaya,
+                    color = if (isSelected) GoldPrimary else TextPrimary,
+                    fontFamily = CairoFont,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                if (isSelected) Text("✓", color = GoldPrimary, fontSize = 14.sp)
+            }
+        }
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+    }
+}
+
+// قسم التفسير والمصادر
+@Composable
+fun GoldenTafsirSourcesView(
+    onBackToMushaf: () -> Unit
+) {
+    val sources = listOf(
+        "التفسير الميسر" to "مجمع الملك فهد لطباعة المصحف الشريف",
+        "تفسير ابن كثير" to "عماد الدين أبو الفداء إسماعيل بن كثير",
+        "جامع البيان في تأويل القرآن" to "محمد بن جرير الطبري",
+        "تيسير الكريم الرحمن" to "عبد الرحمن بن ناصر السعدي",
+        "تفسير الجلالين" to "جلال الدين المحلي وجلال الدين السيوطي",
+        "الجامع لأحكام القرآن" to "أبو عبد الله محمد بن أحمد القرطبي",
+        "الوسيط في تفسير القرآن المجيد" to "علي الصابوني",
+        "أيسر التفاسير" to "أبو بكر جابر الجزائري",
+        "التفسير الوسيط" to "محمد سيد طنطاوي"
+    )
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Text(
+                "التفسير والمصادر 📚",
+                color = GoldPrimary,
+                fontFamily = AmiriFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        }
+        item {
+            Text(
+                "مصادر تفسيرية معتمدة. عرض النصوص الكاملة قيد التجهيز — لن يُعرض أي تفسير غير موثوق المصدر.",
+                color = TextSecondary,
+                fontFamily = NotoSansFont,
+                fontSize = 12.sp
+            )
+        }
+        items(sources) { (title, author) ->
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF151B2B), RoundedCornerShape(12.dp))
+                    .padding(12.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📖 ", fontSize = 14.sp)
+                    Text(
+                        title,
+                        color = TextPrimary,
+                        fontFamily = CairoFont,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(author, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 11.sp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "النص الكامل قيد التجهيز ⏳",
+                    color = GoldPrimary,
+                    fontFamily = NotoSansFont,
+                    fontSize = 11.sp
+                )
+            }
+        }
+        item {
+            TextButton(onClick = onBackToMushaf, modifier = Modifier.fillMaxWidth()) {
+                Text("↵ العودة إلى المصحف الشريف", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+private data class AdhkarItem(
+    val title: String,
+    val text: String,
+    val count: Int,
+    val category: String
+)
+
+// قسم الأذكار (نصوص معتمدة من الأذكار الصحيحة)
+@Composable
+fun GoldenAdhkarView() {
+    val morningAdhkar = listOf(
+        AdhkarItem("سيد الاستغفار", "اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ، وَأَنَا عَلَى عَهْدِكَ وَوَعْدِكَ مَا اسْتَطَعْتُ، أَعُوذُ بِكَ مِنْ شَرِّ مَا صَنَعْتُ، أَبُوءُ لَكَ بِنِعْمَتِكَ عَلَيَّ، وَأَبُوءُ بِذَنْبِي، فَاغْفِرْ لِي، فَإِنَّهُ لَا يَغْفِرُ الذُّنُوبَ إِلَّا أَنْتَ", 1, "الصباح"),
+        AdhkarItem("الذكر الجامع", "أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ", 1, "الصباح"),
+        AdhkarItem("آية الكرسي", "اللَّهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ…", 1, "الصباح"),
+        AdhkarItem("سورة الإخلاص والمعوذتان", "قُلْ هُوَ اللَّهُ أَحَدٌ • قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ • قُلْ أَعُوذُ بِرَبِّ النَّاسِ", 3, "الصباح"),
+        AdhkarItem("دعاء الصباح", "اللَّهُمَّ بِكَ أَصْبَحْنَا، وَبِكَ أَمْسَيْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ النُّشُورُ", 1, "الصباح")
+    )
+    val eveningAdhkar = listOf(
+        AdhkarItem("الذكر الجامع", "أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ، وَالْحَمْدُ لِلَّهِ، لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ", 1, "المساء"),
+        AdhkarItem("آية الكرسي", "اللَّهُ لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ…", 1, "المساء"),
+        AdhkarItem("سورة الإخلاص والمعوذتان", "قُلْ هُوَ اللَّهُ أَحَدٌ • قُلْ أَعُوذُ بِرَبِّ الْفَلَقِ • قُلْ أَعُوذُ بِرَبِّ النَّاسِ", 3, "المساء"),
+        AdhkarItem("دعاء المساء", "اللَّهُمَّ بِكَ أَمْسَيْنَا، وَبِكَ أَصْبَحْنَا، وَبِكَ نَحْيَا، وَبِكَ نَمُوتُ، وَإِلَيْكَ الْمَصِيرُ", 1, "المساء")
+    )
+
+    LazyColumn(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Text(
+                "الأذكار 🤲",
+                color = GoldPrimary,
+                fontFamily = AmiriFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        }
+        item {
+            Text(
+                "أذكار ثابتة من الأذكار الصحيحة (الصباح والمساء). العداد يعمل يدوياً للحفظ والتدبّر، والتسبيح الإلكتروني قيد التجهيز.",
+                color = TextSecondary,
+                fontFamily = NotoSansFont,
+                fontSize = 12.sp
+            )
+        }
+        item { Spacer(modifier = Modifier.height(2.dp)) }
+        item { Text("أذكار الصباح ☀️", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+        items(morningAdhkar) { dhikr ->
+            AdhkarCard(dhikr = dhikr)
+        }
+        item { Spacer(modifier = Modifier.height(4.dp)) }
+        item { Text("أذكار المساء 🌙", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 14.sp) }
+        items(eveningAdhkar) { dhikr ->
+            AdhkarCard(dhikr = dhikr)
+        }
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "تنبيه: الأذكار منقولة من مصنفات الأذكار المعتمدة دون تصرف في اللفظ. النصوص المقتبسة الهامة تُعرض كاملة في نسخة قادمة.",
+                color = TextSecondary,
+                fontFamily = NotoSansFont,
+                fontSize = 10.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdhkarCard(dhikr: AdhkarItem) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF151B2B), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                "${dhikr.title} • ${dhikr.category}",
+                color = GoldPrimary,
+                fontFamily = CairoFont,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                dhikr.text,
+                color = TextPrimary,
+                fontFamily = AmiriFont,
+                fontSize = 14.sp
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(GoldPrimary.copy(alpha = 0.15f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("×${dhikr.count}", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
     }
 }
