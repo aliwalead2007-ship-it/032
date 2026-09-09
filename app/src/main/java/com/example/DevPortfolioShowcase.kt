@@ -44,7 +44,9 @@ data class PortfolioSampleItem(
     val thumbnailUrl: String,
     val videoPreviewUrl: String,
     val description: String,
-    val clientType: String
+    val clientType: String,
+    /** علَم تسويقي: true يعني أن هذا العنصر عرض توضيحي وليس عملاً فعلياً لمستخدم إنتاج. */
+    val isPlaceholder: Boolean = true
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +60,12 @@ fun DevPortfolioShowcaseScreen(
     var showPitchDialog by remember { mutableStateOf(false) }
 
     val sampleList = remember {
+        // ────────────────────────────────────────────────────────────────────────────
+        // عروض تسويقية للعرض على العملاء (Marketing samples — ليست بيانات إنتاج).
+        // الأصول (صور/فيديو) من Unsplash و mixkit لأغراض العرض فقط؛
+        // يُستبدل هذا المحتوى بمعرض أعمال المطوّر الفعلي بعد ربط Firestore.
+        // كل العناصر تحمل isPlaceholder=true افتراضياً ليُعرض شارة "نموذج" في الواجهة.
+        // ────────────────────────────────────────────────────────────────────────────
         listOf(
             PortfolioSampleItem(
                 id = "sample_1",
@@ -335,7 +343,25 @@ fun DevPortfolioShowcaseScreen(
                         }
 
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Text(sample.title, color = Color.White, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(sample.title, color = Color.White, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                                if (sample.isPlaceholder) {
+                                    Surface(
+                                        color = Color(0xFF1E293B),
+                                        shape = RoundedCornerShape(4.dp),
+                                        border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.6f))
+                                    ) {
+                                        Text(
+                                            "نموذج",
+                                            color = GoldPrimary,
+                                            fontFamily = CairoFont,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(sample.description, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 12.sp, lineHeight = 18.sp)
 

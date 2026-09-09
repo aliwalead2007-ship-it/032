@@ -948,8 +948,9 @@ fun UsersSection(context: Context, devUsers: androidx.compose.runtime.snapshots.
     var newUserName by remember { mutableStateOf("") }
     var newUserEmail by remember { mutableStateOf("") }
     var newUserType by remember { mutableStateOf("Freemium") }
+    val coroutineScope = rememberCoroutineScope()
 
-    val filteredUsers = devUsers.filter { 
+    val filteredUsers = devUsers.filter {
         it.name.contains(searchQuery, ignoreCase = true) || it.email.contains(searchQuery, ignoreCase = true)
     }
 
@@ -977,20 +978,41 @@ fun UsersSection(context: Context, devUsers: androidx.compose.runtime.snapshots.
                 Button(
                     onClick = {
                         if (newUserName.isNotBlank() && newUserEmail.isNotBlank()) {
+                            val newId = java.util.UUID.randomUUID().toString()
+                            // تحديث القائمة فوراً لتجربة مستخدم سلسة، مع تاريخ حقيقي
                             devUsers.add(
                                 DevUser(
-                                    id = java.util.UUID.randomUUID().toString(),
+                                    id = newId,
                                     name = newUserName,
                                     email = newUserEmail,
                                     type = newUserType,
                                     projectCount = 0,
-                                    regDate = "اليوم"
+                                    regDate = DevDashboardFormatters.formatRegDate(System.currentTimeMillis())
                                 )
                             )
                             newUserName = ""
                             newUserEmail = ""
                             showAddUserDialog = false
-                            Toast.makeText(context, "تمت إضافة المستخدم بنجاح", Toast.LENGTH_SHORT).show()
+                            // الكتابة السحابية await حقيقية — Toast نجاح/فشل بحسب النتيجة
+                            coroutineScope.launch {
+                                val saved = runCatching {
+                                    CloudServices.Database.saveUserToCloud(
+                                        userId = newId,
+                                        name = devUsers.last().name,
+                                        email = devUsers.last().email,
+                                        type = devUsers.last().type,
+                                        projectCount = 0
+                                    )
+                                }.getOrElse { e ->
+                                    android.util.Log.e("UsersSection", "saveUserToCloud threw: ${e.message}", e)
+                                    false
+                                }
+                                if (saved) {
+                                    Toast.makeText(context, "تمت إضافة المستخدم وحفظه في السحابة", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "تمت الإضافة محلياً فقط — فشل الحفظ في السحابة", Toast.LENGTH_LONG).show()
+                                }
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
@@ -2851,9 +2873,16 @@ fun PromoCodesSection(context: Context) {
     var giftCode by remember { mutableStateOf("") }
     var pointsAmount by remember { mutableStateOf("") }
     val giftManager = remember { GiftManager(context) }
-    
+    val coroutineScope = rememberCoroutineScope()
+
     var customPromos by remember { mutableStateOf(giftManager.getCustomPromoCodes()) }
     var customGifts by remember { mutableStateOf(giftManager.getCustomGiftCards()) }
+
+    // تحديث الكاش من Firestore كلما فُتحت هذه الشاشة، ضماناً لرؤية أحدث الأكواد.
+    LaunchedEffect(Unit) {
+        runCatching { giftManager.loadValidCodesFromCloud() }
+            .onFailure { android.util.Log.e("PromoCodesSection", "loadValidCodesFromCloud failed: ${it.message}", it) }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -2920,11 +2949,17 @@ fun PromoCodesSection(context: Context) {
                     Button(
                         onClick = {
                             if (promoCode.isNotBlank() && durationDays.toIntOrNull() != null) {
-                                giftManager.addCustomPromoCode(promoCode, durationDays.toInt())
-                                customPromos = giftManager.getCustomPromoCodes()
-                                Toast.makeText(context, "تم إضافة كود الترقية بنجاح!", Toast.LENGTH_SHORT).show()
-                                promoCode = ""
-                                durationDays = ""
+                                coroutineScope.launch {
+                                    val saved = giftManager.addCustomPromoCode(promoCode, durationDays.toInt())
+                                    customPromos = giftManager.getCustomPromoCodes()
+                                    if (saved) {
+                                        Toast.makeText(context, "تم إضافة كود الترقية بنجاح!", Toast.LENGTH_SHORT).show()
+                                        promoCode = ""
+                                        durationDays = ""
+                                    } else {
+                                        Toast.makeText(context, "فشل حفظ الكود في السحابة. تحقق من الاتصال وحاول مجدداً.", Toast.LENGTH_LONG).show()
+                                    }
+                                }
                             } else {
                                 Toast.makeText(context, "تأكد من إدخال البيانات بشكل صحيح", Toast.LENGTH_SHORT).show()
                             }
@@ -2983,11 +3018,17 @@ fun PromoCodesSection(context: Context) {
                     Button(
                         onClick = {
                             if (giftCode.isNotBlank() && pointsAmount.toIntOrNull() != null) {
-                                giftManager.addCustomGiftCard(giftCode, pointsAmount.toInt())
-                                customGifts = giftManager.getCustomGiftCards()
-                                Toast.makeText(context, "تم إضافة بطاقة الهدايا بنجاح!", Toast.LENGTH_SHORT).show()
-                                giftCode = ""
-                                pointsAmount = ""
+                                coroutineScope.launch {
+                                    val saved = giftManager.addCustomGiftCard(giftCode, pointsAmount.toInt())
+                                    customGifts = giftManager.getCustomGiftCards()
+                                    if (saved) {
+                                        Toast.makeText(context, "تم إضافة بطاقة الهدايا بنجاح!", Toast.LENGTH_SHORT).show()
+                                        giftCode = ""
+                                        pointsAmount = ""
+                                    } else {
+                                        Toast.makeText(context, "فشل حفظ البطاقة في السحابة. تحقق من الاتصال وحاول مجدداً.", Toast.LENGTH_LONG).show()
+                                    }
+                                }
                             } else {
                                 Toast.makeText(context, "تأكد من إدخال البيانات بشكل صحيح", Toast.LENGTH_SHORT).show()
                             }

@@ -179,18 +179,98 @@ object CloudServices {
             }
         }
 
-        fun savePromoCodeToCloud(code: String, type: String, value: Long) {
-            if (!isFirebaseInitialized) return
-            try {
+        /**
+         * حفظ/دمج سجل مستخدم في مجموعة users من لوحة إدارة المطور.
+         * يكتب createdAt كـ epoch millis ليسهل تنسيقه عبر DevDashboardFormatters.formatRegDate.
+         * يُرجع true عند النجاح، false عند الفشل (لتُمكِّن الـ UI من عرض Snackbar للخطأ).
+         */
+        suspend fun saveUserToCloud(
+            userId: String,
+            name: String,
+            email: String,
+            type: String,
+            projectCount: Int = 0
+        ): Boolean {
+            if (!isFirebaseInitialized) {
+                Log.w(TAG, "Firebase is not initialized. Cannot save user to cloud.")
+                return false
+            }
+            return try {
+                val userMap = hashMapOf(
+                    "id" to userId,
+                    "name" to name,
+                    "email" to email,
+                    "type" to type,
+                    "projectCount" to projectCount,
+                    "createdAt" to System.currentTimeMillis(),
+                    "status" to "نشط الآن",
+                    "isSuspended" to false,
+                    "strikes" to 0,
+                    "source" to "dev_dashboard"
+                )
+                db.collection("users").document(userId)
+                    .set(userMap, com.google.firebase.firestore.SetOptions.merge()).await()
+                Log.d(TAG, "User ($userId, $email) saved to Firestore successfully.")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error saving user to cloud: ${e.message}", e)
+                false
+            }
+        }
+
+        suspend fun savePromoCodeToCloud(code: String, type: String, value: Long): Boolean {
+            if (!isFirebaseInitialized) {
+                Log.w(TAG, "Firebase is not initialized. Cannot save promo code to cloud.")
+                return false
+            }
+            return try {
+                val normalized = code.uppercase(java.util.Locale.ROOT)
                 val codeMap = hashMapOf(
-                    "code" to code.uppercase(java.util.Locale.ROOT),
+                    "code" to normalized,
                     "type" to type, // "PROMO" or "GIFT"
                     "value" to value,
                     "createdAt" to System.currentTimeMillis()
                 )
-                db.collection("promo_codes").document(code.uppercase(java.util.Locale.ROOT)).set(codeMap)
+                db.collection("promo_codes").document(normalized).set(codeMap).await()
+                Log.d(TAG, "Promo code ($normalized) saved to Firestore successfully.")
+                true
             } catch (e: Exception) {
-                Log.e(TAG, "Error saving promo code: ${e.message}")
+                Log.e(TAG, "Error saving promo code: ${e.message}", e)
+                false
+            }
+        }
+
+        /**
+         * جلب الأكواد الصالحة من Firestore وتحويلها إلى شكل قابل للاستخدام.
+         * الكاش المحلي يُملأ مرة عند الإقلاع ثم يُحدَّث بعد كل كتابة جديدة.
+         * يُرجع Pair(promos, giftCards) حيث promos=Map<code, durationMs> و giftCards=Map<code, points>.
+         */
+        suspend fun fetchValidCodesCache(): Pair<Map<String, Long>, Map<String, Int>> {
+            if (!isFirebaseInitialized) return Pair(emptyMap(), emptyMap())
+            return try {
+                val snapshot = db.collection("promo_codes").get().await()
+                val promos = mutableMapOf<String, Long>()
+                val gifts = mutableMapOf<String, Int>()
+                for (doc in snapshot.documents) {
+                    val data = doc.data ?: continue
+                    val code = (data["code"] as? String) ?: continue
+                    val type = (data["type"] as? String) ?: continue
+                    val raw = data["value"]
+                    when (type) {
+                        "PROMO" -> {
+                            val days = (raw as? Number)?.toLong() ?: continue
+                            promos[code] = days * 24L * 60L * 60L * 1000L
+                        }
+                        "GIFT" -> {
+                            val points = (raw as? Number)?.toInt() ?: continue
+                            gifts[code] = points
+                        }
+                    }
+                }
+                Pair(promos, gifts)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching valid codes from Firestore: ${e.message}", e)
+                Pair(emptyMap(), emptyMap())
             }
         }
 
