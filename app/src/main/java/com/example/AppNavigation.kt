@@ -38,13 +38,6 @@ fun AppNavigation(
         label = "qabas_screen_transition"
     ) { appState ->
     when (appState) {
-        AppState.SPLASH -> {
-            SplashScreen(
-                onSplashFinished = {
-                    viewModel.updateState { copy(appState = AppState.DATA_LOADING) }
-                }
-            )
-        }
         AppState.DATA_LOADING -> {
             DataLoadingScreen(
                 onLoadProjects = { viewModel.loadProjectsSuspend() },

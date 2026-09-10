@@ -30,7 +30,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -101,7 +100,6 @@ fun RatioButton(
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         val prefs = getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
@@ -274,7 +272,7 @@ fun QabasBottomNavigation(
 }
 
 enum class AppState {
-    PREMIUM_UPGRADE, SPLASH, DATA_LOADING, ONBOARDING, LOGIN, REGISTER, FORGOT_PASSWORD,
+    PREMIUM_UPGRADE, DATA_LOADING, ONBOARDING, LOGIN, REGISTER, FORGOT_PASSWORD,
     DEVELOPER_DASHBOARD, HOME, PROJECTS, INPUT, UNDERSTANDING, RESOURCES, PROCESSING, REVIEW,
     ADVANCED_EDIT, PAYMENT, SAVE_SHARE, SAVE_PROJECT, API_DOCS, SETTINGS, TELEPROMPTER,
     AUDIO_LIBRARY, AI_ASSISTANT, YOUTUBE_STUDIO, API_KEYS, LEADERBOARD, PROFILE, APP_IDEA_FORM,
@@ -323,7 +321,7 @@ class ProjectViewModel(private val context: Context) : ViewModel() {
 
     private val _state = MutableStateFlow(
         ProjectState(
-            appState = AppState.SPLASH,
+            appState = AppState.DATA_LOADING,
             selectedRatio = prefs.getString("ratio", "9:16") ?: "9:16",
             inputText = prefs.getString("input", "") ?: "",
             videoDuration = prefs.getString("duration", Translator.tr("30 ثانية"))

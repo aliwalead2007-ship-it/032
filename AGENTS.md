@@ -87,7 +87,7 @@
 |-----|--------|
 | `assets/audio/entry_ayah_ruj3a.m4a` | «إن إلى ربك الرجعى» ~7ث |
 | `AudioPlayerManager.kt` | تشغيل + **fade in ~0.9ث** + **fade out ~1.1ث** + كتم |
-| `SplashScreen.kt` | شاشة السبلاش بهوية قبس الرسمية الكاملة (الشعلة فوق الكتاب + قبس + الآية والعبارة) مع أنيميشن خفيف (Fade + Scale + Glow) بدون صوت ودعم التخطي ومهلة أمان |
+| `SplashScreen.kt` | **أُزيل كلياً (سبتمبر 2026)** — السبلاش لم يعد موجوداً في أي مكان (كود/موارد/ثيم)؛ الأيقونة حُيّدت بمظهر ذهبي محايد لحين استلام اللوجو الجديد |
 | `QabasLottieAnimations.kt` | بوابة الاستوديو الذهبية `STUDIO_ENTRY_PORTAL_JSON` وموجة المايك `STUDIO_MIC_WAVE_JSON` |
 | `QabasHomeScreen.kt` | تفاعل دخول ناعم (`scale` + `alpha` مع `spring()`)، بوابة استوديو Lottie، وترتيب الأقسام (المشاريع بعد الـ Hero مباشرة مع `defaultExpanded = true` والأقسام المساعدة مطوية افتراضياً) |
 
@@ -243,6 +243,20 @@
 | الإصلاحات أثناء البناء | إزالة import غير موجود `androidx.compose.ui.graphics.StrokeWidth`؛ إضافة `androidx.compose.runtime.setValue` لتفويضات `var … by remember`؛ **المشروع فعلياً يحلّ `compose.ui = 1.9.0`** (تجاوز BOM 2024.09.00 بالصراع) فأُعيد توجيه الاهتزاز إلى API الجديد: `androidx.compose.ui.hapticfeedback.HapticFeedbackType` + `androidx.compose.ui.platform.LocalHapticFeedback`. |
 | البناء | `:app:assembleDebug` أخضر (1m12s) — تحذير واحد فقط: `Icons.Filled.MenuBook` deprecated (مطابق لاستخدام `MainActivity.kt:195` نفسه). |
 
+### غ) إزالة السبلاش كلياً + حياد أيقونة الـ Launcher — استقبال اللوجو الجديد (سبتمبر 2026)
+
+| عنصر | ماذا أُنجز |
+|-----|------------|
+| القرار | بطلب مباشر من المالك («ازله كليا») — شاشة السبلاش أُزيلت كلياً ولم يعد لها أي أثر (كود/موارد/ثيم)، مع التنظيف الكامل للوجوهات القديمة من الأصول لحين استلام اللوجو الجديد. |
+| `MainActivity.kt` | حذف `installSplashScreen` (import + استدعاء) وحذف `AppState.SPLASH`؛ الحالة الابتدائية الآن `AppState.DATA_LOADING` مباشرة. |
+| `AppNavigation.kt` | حذف فرع `SPLASH` من `when` — الدخول يبدأ من `DATA_LOADING`. |
+| `AndroidManifest.xml` | `android:theme="@style/Theme.Qabas.Splash"` ← `@style/Theme.MyApplication` (لا أثر لثيم السبلاش). |
+| حذف | `SplashScreen.kt` (إنتاج كامل)، `values/themes_splash.xml`، `values/colors_splash.xml`، `drawable/ic_qabas_splash_icon.xml`، وكل أصول اللوجو القديمة: `qabas_logo.webp`، `qabas_logo_pro.xml`، `qabas_app_icon_*.jpg`، `qabas_logo_*.jpg`، `ic_qabas_foreground.png`، `ic_launcher_foreground.xml`، `ic_launcher_background.xml`، وجميع `ic_launcher*.webp` في مجلدات الكثافة الخمس. |
+| `LoginScreen.kt` | حذف كتلة اللوجو الرسمي (كانت تُحمّل `qabas_logo` قبل حذفه) مع استيرادات `Image/ContentScale/painterResource` — الشاشة سليمة. |
+| أيقونة محايدة | `drawable/ic_launcher_foreground_neutral.xml` (حلقة + نجمة ٨ رؤوس ذهبي `#D4AF37` على شفاف) استُعمل كـ foreground/monochrome في ملفّي `mipmap-anydpi-v26`؛ وأُنشئ `mipmap/ic_launcher.xml` + `ic_launcher_round.xml` (vector 108dp: خلفية `#030508` + رمز ذهبي) كـ fallback لـ API 24–25 بعد حذف الـ webps. `ic_launcher_background_qabas.xml` مُبقى. |
+| التحقق | grep نهائي على `app/src` بلا أي مطابقة لـ: `AppState.SPLASH|SplashScreen|Theme.Qabas.Splash|ic_qabas_splash_icon|qabas_splash_background|ic_qabas_foreground|qabas_logo|qabas_app_icon|qabas_logo_pro|ic_launcher_background"|ic_launcher_foreground"`. |
+| متبقٍّ (لا يُلمس الآن) | شاشة التحميل الداخلية `DataLoadingScreen` تحمّل لوجو من `assets/logo/p0..p4.txt` (Base64) — يُستبدل عند استلام اللوجو الجديد. صوت آية الدخول خارج النطاق. |
+
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
@@ -269,8 +283,10 @@
 تحقق: كابشن عربي، مدة، تشغيل بدون نت / بدون TTS إن أمكن.  
 **تذكير للاختبار:** أي انهيار يحدث الآن يُسجَّل تلقائياً (ملف `crash_logs/` + سطر في لوحة المطور بستاك كامل) — انسخ رسالة الانهيار من لوحة المطور عند البلاغ إن أمكن.
 
-### تحقق المعالجة البصرية للسبلاش
-→ السبلاش أُعيدت كتابته كُلياً (كتاب مفتوح بطرف Compose). عند أول تشغيل للجهاز: تحقق من الفتح، الطبقة الذهبية، الآية، التخطي، ومهلة الأمان (4.5ث) — أي عيب بصري يُبلَّغ لضبط الحركات فقط، لا عودة لمسار التصدير.
+### تسليم اللوجو الجديد (يحل محل «تحقق المعالجة البصرية للسبلاش» — السبلاش أُزيل كلياً)
+→ بانتظار ملف اللوجو الجديد من المالك (PNG ≥1024 بخلفية شفافة أو SVG). عند استلامه:
+1) أيقونة الـ launcher: استبدال `drawable/ic_launcher_foreground_neutral.xml` (يُستعمل في adaptive `mipmap-anydpi-v26`) وفي `mipmap/ic_launcher.xml` / `ic_launcher_round.xml` (vector لـ API<26)، أو وضع PNG بديل يحل محل الحلقة/النجمة المحايدة.
+2) لوجو شاشة التحميل `assets/logo/p0..p4.txt` (Base64 — يُعاد توليده من الملف الجديد) المستخدم في `DataLoadingScreen`.
 
 ### تحقق حلقة التنقل الشمسية (مُضاف حديثاً — بديل الشريط السفلي)
 → الشريط السفلي استُبدل بنظام «الكواكب حول الشمس»: 5 كواكب تدور ببطء (8°/ث) حول شعلة ذهبية. تحقق: 1) نقرة كوكب → يظهر حوار تأكيد «الدخول إلى …؟» و«تأكيد ✓»/«إلغاء» — لا تنقّل قبل التأكيد. 2) تأكيد → يتحول الحِجْر ويُفتح القسم الصحيح مع اهتزاز خفيف. 3) الكوكب النشط يقع عند المقعد السفلي (270°) ويكبر ويلمع بحد ذهبي وكابشن ذهبي داكن. 4) عند إغلاق التطبيق أو فتح حوار يَتوقف الدوران (لا يتحرك في الخلفية). 5) كل الأقسام الخمسة تعمل كما في السابق — **لا حذف لأي قسم أو ميزة**. أي عيب بصري/حركي يُبلَّغ لضبط الحركات فقط، لا عودة لمسار التصدير.
@@ -315,7 +331,6 @@ app/src/main/java/com/example/ProcessingScreen.kt
 app/src/main/java/com/example/RealServices.kt
 app/src/main/java/com/example/ui/input/IdeaInputSection.kt
 app/src/main/java/com/example/AudioPlayerManager.kt
-app/src/main/java/com/example/SplashScreen.kt
 app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 ```
 
@@ -341,7 +356,8 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 > **التفسير الميسر الحقيقي المدمج (سبتمبر 2026):** دُمج **نص التفسير الميسر** (مجمع الملك فهد) مُنزَّلاً برمجياً من `Nasaq-GP/Quran_tafsir` (6236 صفاً، لا حرف مكتوب يدوياً، 2:255 مطابق للمطبوع) في `assets/quran/tafsir_muyassar.json` (~2.68MB، غلاف 1:1..114:6 تام) — `loadTafsirFromAssets` كسول بفحص مسارين + `parseTafsirJson` يقرأ بنية `{s,a,t}` بدعم بدائل {surah,ayah,text} + `getTafsirForVerse` بمفتاح «سورة:آية» يُرجع null عند الغياب؛ `getVersesForSurah` و`searchVerses` تملآن `tafseer` الحقيقي بدل الثابت الفارغ؛ حوار التفسير يعرض النص الحقيقي والقطرة أصبحت صادقة «لا يتوفر تفسير ميسر لهذه الآية في النسخة المدمجة حالياً.»؛ وبطاقة الميسر في «التفسير والمصادر 📚» حملت شارة «مدمج ✓ متاح الآن في المصحف» (بقية المصادر قيد التجهيز بلا تفسير غير موثوق). البناء أخضر (1m22s).  
 > **الأولوية القادمة:** اختبار التصدير على جهاز حقيقي — أي انهيار يظهر الآن يُسجَّل تلقائياً للتوثيق والإصلاح؛ والسبلاش الجديد يُتحقق بصرياً عند أول تشغيل؛ وقسم القرآن (Hub والنص العثماني والبحث بتظليلهم والتفسير الميسر) يُتحققون كما في القسم 4.  
 > **ما بعد التحقق (مجدول في beads):** ختمة/تتبع الأحزاب ← أوقات الصلاة + القبلة ← تلاوة حقيقية 40+ قارئاً مع تشغيل خلفي (يتطلب foreground service + `ACCESS_FINE_LOCATION`) ← إعراب/معنى كلمة.
-> **حلقة شمسية للتنقل (سبتمبر 2026):** استُبدل الشريط السفلي بلا أي حذف — `QabasSolarSystemNavigation.kt` جديد: 5 كواكب (الألوان/الترتيب الأصليان) تدور 8°/ث حول شعلة ذهبية بتثبيت الكوكب النشط عند 270° (الحركة عبر `graphicsLayer` فقط، تجميد عند غير RESUMED أو عند فتح الحوار، احترام `ANIMATOR_DURATION_SCALE`)، ونقرة كوكب → حوار تأكيد («الدخول إلى …؟»/«تأكيد ✓»/«إلغاء») → تنقّل، واهتزاز خفيف — `QabasBottomNavigation` باقٍ دون استخدام. أُصلح في البناء: compose.ui المحلول فعلياً 1.9.0 (تجاوز BOM بالصراع) فأُعيد توجيه الاهتزاز لـ `androidx.compose.ui.hapticfeedback.HapticFeedbackType` + `androidx.compose.ui.platform.LocalHapticFeedback`. البناء أخضر (1m12s).
+> **حلقة شمسية للتنقل (سبتمبر 2026):** استُبدل الشريط السفلي بلا أي حذف — `QabasSolarSystemNavigation.kt` جديد: 5 كواكب (الألوان/الترتيب الأصليان) تدور 8°/ث حول شعلة ذهبية بتثبيت الكوكب النشط عند 270° (الحركة عبر `graphicsLayer` فقط، تجميد عند غير RESUMED أو عند فتح الحوار، احترام `ANIMATOR_DURATION_SCALE`)، ونقرة كوكب → حوار تأكيد («الدخول إلى …؟»/«تأكيد ✓»/«إلغاء») → تنقّل، واهتزاز خفيف — `QabasBottomNavigation` باقٍ دون استخدام. أُصلح في البناء: compose.ui المحلول فعلياً 1.9.0 (تجاوز BOM بالصراع) فأُعيد توجيه الاهتزاز لـ `androidx.compose.ui.hapticfeedback.HapticFeedbackType` + `androidx.compose.ui.platform.LocalHapticFeedback`. البناء أخضر (1m12s).  
+> **إزالة السبلاش + حياد الأيقونة (سبتمبر 2026):** بطلب المالك («ازله كليا») أُزيلت شاشة السبلاش كلياً — لا أثر لها في كود/موارد/ثيم (`MainActivity` يبدأ من `DATA_LOADING` بلا `installSplashScreen`، `AndroidManifest` theme ← `Theme.MyApplication`)، وحُذفت كل أصول اللوجو القديمة (`qabas_logo*.webp/xml/jpg`، `ic_qabas_*`، webps كثافات الـ launcher)، وحُيّدت أيقونة الـ launcher بمظهر ذهبي محايد (foreground neutral + fallback vector لـ API<26) وحدفت كتلة اللوجو من `LoginScreen.kt` — التحقق grep صفر. **الخطوة التالية:** استلام اللوجو الجديد (PNG ≥1024 بخلفية شفافة أو SVG) وتطبيقه في الأيقونة + لوجو شاشة التحميل `assets/logo/p*.txt`.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
 ## Beads Issue Tracker
