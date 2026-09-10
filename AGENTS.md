@@ -257,6 +257,18 @@
 | التحقق | grep نهائي على `app/src` بلا أي مطابقة لـ: `AppState.SPLASH|SplashScreen|Theme.Qabas.Splash|ic_qabas_splash_icon|qabas_splash_background|ic_qabas_foreground|qabas_logo|qabas_app_icon|qabas_logo_pro|ic_launcher_background"|ic_launcher_foreground"`. |
 | متبقٍّ (لا يُلمس الآن) | شاشة التحميل الداخلية `DataLoadingScreen` تحمّل لوجو من `assets/logo/p0..p4.txt` (Base64) — يُستبدل عند استلام اللوجو الجديد. صوت آية الدخول خارج النطاق. |
 
+### ذ) طبقة OpenAI الاختيارية + إغلاق صلاحيات البريد نهائياً — الأعلام فقط (سبتمبر 2026)
+
+| عنصر | ماذا أُنجز |
+|-----|------------|
+| `RealOpenAIService.kt` (جديد) | محادثة حقيقية عبر `gpt-4o-mini` (Chat Completions) بقراءة المفاتيح من `qabas_prefs` ثم BuildConfig، مع fallback آمن: **OpenAI → Groq → Gemini** في `chatWithAssistant` و`executeShortTaskWithFallback` — متاح اختيارياً دون إزاحة أي خدمة مجانية. |
+| `RealServices.kt` / `ApiKeyValidator.kt` / `ApiKeysScreen.kt` | مفتاح OpenAI `sk-proj-…`: بطاقة في شاشة المفاتيح، تحقق حقيقي، تصدير/استيراد في نسخ الـ JSON الاحتياطية، ولفّ `ApiUsageTracker` — وقياسه يظهر في لوحة المطور. |
+| `DeveloperDashboardScreen.kt` | إدخال «مفاتيح API 🔑» (بطاقة `Icons.Default.VpnKey`) في شبكة اللوحة الرئيسية → قسم جديد `DashboardSection.API_KEYS` داخل اللوحة (بلا مغادرة). |
+| `.env.example` / `.env` | `OPENAI_API_KEY="your_key"` placeholder غير فارغ؛ `.env` مستثنى من git (السطر 17). **قاعدة أمنية:** لا يُحفظ أي مفتاح حقيقي في الكود/ملف مقتَفَع (يُستخرَج من الـ APK) — المفتاح الحقيقي في `.env` المحلي فقط أو GitHub Secret. |
+| `AccountService.kt`/`LoginScreen.kt`/`AuthScreens.kt`/`SettingsScreen.kt`/`RequestChatScreen.kt`/`LeagueService.kt` | **إزالة كل صلاحيات البريد المخزَّنة يدوياً** (`aly750834`/`aliwalead`/`xman88371`/`admin@qabas`/`family@qabas`/`friend@qabas`/`peeesa7`/هكذا): الصلاحيات الآن **أعلام `qabas_prefs` فقط** (`is_admin`/`is_relative`/`is_developer`). `is_developer` يُحفظ دائماً بـ `prefs.getBoolean("is_developer", true)` — لا يُكتب `false` أبداً؛ والتسجيل/الدخول لن يسيّرا تطويراً حسب البريد. |
+| التسامح | `is_developer` افتراضياً `true` عند غياب المفتاح (وضع المطور مفعّل منذ البداية)؛ لا قفل للمطور القديم لأن الجهاز المخوَّل سابقاً محتفظ بعلامته المكتوبة قبل التحديث. |
+| التحقق | grep على `app/src/main` بلا مطابقة لـ `aly750834\|peeesa7\|family@qabas\|friend@qabas\|admin@qabas\|isDevEmail\|contains("admin")`؛ `DeveloperDashboardScreen.kt:411` تبقى تسمية عرض فقط («المطور الرئيسي: aliwalead.2007») لا تُوصِل صلاحية. |
+
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
@@ -358,6 +370,7 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 > **ما بعد التحقق (مجدول في beads):** ختمة/تتبع الأحزاب ← أوقات الصلاة + القبلة ← تلاوة حقيقية 40+ قارئاً مع تشغيل خلفي (يتطلب foreground service + `ACCESS_FINE_LOCATION`) ← إعراب/معنى كلمة.
 > **حلقة شمسية للتنقل (سبتمبر 2026):** استُبدل الشريط السفلي بلا أي حذف — `QabasSolarSystemNavigation.kt` جديد: 5 كواكب (الألوان/الترتيب الأصليان) تدور 8°/ث حول شعلة ذهبية بتثبيت الكوكب النشط عند 270° (الحركة عبر `graphicsLayer` فقط، تجميد عند غير RESUMED أو عند فتح الحوار، احترام `ANIMATOR_DURATION_SCALE`)، ونقرة كوكب → حوار تأكيد («الدخول إلى …؟»/«تأكيد ✓»/«إلغاء») → تنقّل، واهتزاز خفيف — `QabasBottomNavigation` باقٍ دون استخدام. أُصلح في البناء: compose.ui المحلول فعلياً 1.9.0 (تجاوز BOM بالصراع) فأُعيد توجيه الاهتزاز لـ `androidx.compose.ui.hapticfeedback.HapticFeedbackType` + `androidx.compose.ui.platform.LocalHapticFeedback`. البناء أخضر (1m12s).  
 > **إزالة السبلاش + حياد الأيقونة (سبتمبر 2026):** بطلب المالك («ازله كليا») أُزيلت شاشة السبلاش كلياً — لا أثر لها في كود/موارد/ثيم (`MainActivity` يبدأ من `DATA_LOADING` بلا `installSplashScreen`، `AndroidManifest` theme ← `Theme.MyApplication`)، وحُذفت كل أصول اللوجو القديمة (`qabas_logo*.webp/xml/jpg`، `ic_qabas_*`، webps كثافات الـ launcher)، وحُيّدت أيقونة الـ launcher بمظهر ذهبي محايد (foreground neutral + fallback vector لـ API<26) وحدفت كتلة اللوجو من `LoginScreen.kt` — التحقق grep صفر. **الخطوة التالية:** استلام اللوجو الجديد (PNG ≥1024 بخلفية شفافة أو SVG) وتطبيقه في الأيقونة + لوجو شاشة التحميل `assets/logo/p*.txt`.
+> **طبقة OpenAI + الأعلام فقط (سبتمبر 2026):** خيار محادثة حقيقي عبر `gpt-4o-mini` بأولوية **OpenAI → Groq → Gemini** (بطاقة مفتاح `sk-proj-…` في شاشة المفاتيح + تحقق + نسخ احتياطي + قياس `ApiUsageTracker` + إدخال «مفاتيح API 🔑» بلوحة المطور)، و`.env.example` بـ `your_key` — القاعدة الأمنية: لا مفتاح حقيقي في كود مقتَفَع (المفتاح في `.env` المحلي أو GitHub Secret). **صلاحيات البريد أُغلقت نهائياً:** admin/قريب/مطوّر = أعلام `qabas_prefs` فقط بعد إزالة كل الأنماط (`aly750834`/`aliwalead`/`xman88371`/`admin@…`/`family@…`/`friend@…`/`peeesa7`) من AccountService/LoginScreen/AuthScreens/SettingsScreen/RequestChatScreen/LeagueService؛ `is_developer` لا يُكتب `false` أبداً (يُحفظ `prefs.getBoolean("is_developer", true)`) — وضع المطور مفعّل افتراضياً، ولا قفل للمطور القديم. التحقق grep صفر لبقايا الأنماط.
 
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:970c3bf2 -->
 ## Beads Issue Tracker

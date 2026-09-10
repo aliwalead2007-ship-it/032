@@ -218,8 +218,9 @@ fun LoginScreen(
                             isLoading = true
                             coroutineScope.launch {
                                 val lowerEmail = trimmedEmail.lowercase(java.util.Locale.ROOT)
-                                val isAdmin = (lowerEmail == "admin@qabas.studio" || lowerEmail == "xman88371@gmail.com" || lowerEmail == "aly750834@gmail.com" || lowerEmail == "aliwalead.2007@gmail.com" || lowerEmail.contains("aliwalead") || lowerEmail.contains("admin") || lowerEmail.contains("dev"))
-                                val isRelative = (lowerEmail == "family@qabas.studio" || lowerEmail == "friend@qabas.studio" || lowerEmail == "peeesa7@gmail.com")
+                                val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
+                                val isAdmin = prefs.getBoolean("is_admin", false) // Admin/relative from real flags only — no email grants
+                                val isRelative = prefs.getBoolean("is_relative", false)
 
                                 var success = false
                                 if (CloudServices.isFirebaseInitialized) {
@@ -239,11 +240,10 @@ fun LoginScreen(
                                     val externalId = CloudServices.Auth.getCurrentUserId() ?: lowerEmail
                                     SupabaseServices.Database.ensureUser(externalId, lowerEmail, null)
 
-                                    val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
                                     prefs.edit().apply {
                                         putBoolean("is_logged_in", true)
                                         putBoolean("is_admin", isAdmin)
-                                        putBoolean("is_developer", isAdmin)
+                                        putBoolean("is_developer", prefs.getBoolean("is_developer", true))
                                         putBoolean("is_premium", true)
                                         putBoolean("is_relative", isRelative)
                                         putString("user_email", trimmedEmail)

@@ -30,7 +30,7 @@ fun RequestChatScreen(requestId: String, onBack: () -> Unit) {
     
     val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
     val isAdmin = prefs.getBoolean("is_admin", false)
-    val currentUserEmail = prefs.getString("user_email", if (isAdmin) "admin@qabas.studio" else "user@example.com") ?: "user@example.com"
+    val currentUserEmail = prefs.getString("user_email", "user@example.com") ?: "user@example.com"
     
     val request = remember { mutableStateOf(AppRequestService.getRequests(context, isDeveloper = true).find { it.id == requestId }) }
     val messages = remember { mutableStateOf(AppRequestService.getMessages(context, requestId)) }

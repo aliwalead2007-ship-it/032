@@ -126,6 +126,60 @@ object ApiKeyValidator {
                         )
                     }
                 }
+                "openai" -> {
+                    if (!Regex("""sk-[A-Za-z0-9_\-]{20,}""").matches(trimmedKey)) {
+                        SystemLogsManager.addLog("ERROR", "مفتاح OpenAI غير صالح الصيغة - صيغة غير sk-", Color(0xFFEF4444))
+                        return@withContext KeyValidationResult(
+                            isValid = false,
+                            summary = "صيغة المفتاح غير صحيحة 🔴",
+                            explanation = "مفتاح OpenAI API الصحيح يبدأ بالبادئة «sk-» ويتكون من 27+ محرفاً. المفتاح الذي أدخلته لا يطابق تلك التركيبة.",
+                            suggestedFix = "افتح platform.openai.com/api-keys ثم اضغط «Create new secret key» وانسخ المفتاح كاملاً (يبدأ بـ sk-…) دون أي مسافات."
+                        )
+                    }
+                    val url = "https://api.openai.com/v1/models"
+                    val request = Request.Builder()
+                        .url(url)
+                        .header("Authorization", "Bearer $trimmedKey")
+                        .build()
+                    val response = ApiUsageTracker.track(context, "OpenAI") { client.newCall(request).execute() }
+                    val code = response.code
+                    val bodyStr = response.body?.string().orEmpty()
+
+                    if (response.isSuccessful) {
+                        SystemLogsManager.addLog("SUCCESS", "مفتاح OpenAI API متصل وسليم (OpenAI - 200 OK)", Color(0xFF4CAF50))
+                        return@withContext KeyValidationResult(
+                            isValid = true,
+                            summary = "متصل بالسيرفر ✅ (OpenAI API شغال حقيقياً)",
+                            errorCode = code,
+                            explanation = "تم التحقق الفعلي من صحة المفتاح واستجابة خوادم OpenAI بنجاح (200 OK).",
+                            suggestedFix = "المفتاح جاهز للعمل الفوري."
+                        )
+                    } else {
+                        val (exp, fix) = when (code) {
+                            401 -> Pair(
+                                "المفتاح غير صحيح أو منتهي الصلاحية على OpenAI.",
+                                "أنشئ مفتاحاً جديداً من platform.openai.com/api-keys."
+                            )
+                            429 -> Pair(
+                                "تم تجاوز حد الاستخدام أو رصيد الحساب منخفض على OpenAI.",
+                                "تحقق من رصيد الحساب أو أعد المحاولة لاحقاً."
+                            )
+                            else -> Pair(
+                                "استجاب خادم OpenAI بكود خطأ ($code): $bodyStr",
+                                "تحقق من اتصال الإنترنت وحالة خدمات OpenAI."
+                            )
+                        }
+                        SystemLogsManager.addLog("ERROR", "فشل التحقق من مفتاح OpenAI API ($code) - $exp", Color(0xFFEF4444))
+                        return@withContext KeyValidationResult(
+                            isValid = false,
+                            summary = "غير متصل 🔴 (كود $code)",
+                            errorCode = code,
+                            rawError = bodyStr.take(200),
+                            explanation = exp,
+                            suggestedFix = fix
+                        )
+                    }
+                }
                 "groq", "grok", "xai" -> {
                     if (trimmedKey.startsWith("xai-", ignoreCase = true)) {
                         val url = "https://api.x.ai/v1/models"

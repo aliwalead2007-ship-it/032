@@ -46,6 +46,7 @@ private val KEY_PATTERNS: Map<String, Regex> = mapOf(
     "groq" to Regex("""(?:gsk_[A-Za-z0-9_\-]{10,}|xai-[A-Za-z0-9_\-]{10,})"""),
     "huggingface" to Regex("""hf_[A-Za-z0-9]{10,}"""),
     "elevenlabs" to Regex("""xi-[A-Za-z0-9_\-]{10,}"""),
+    "openai" to Regex("""sk-[A-Za-z0-9_\-]{20,}"""),
     "azure" to Regex("""(?i)[a-f0-9]{32}"""),
     "pexels" to Regex("""(?<![A-Za-z0-9_-])[A-Za-z0-9]{56}(?![A-Za-z0-9_-])"""),
     "pixabay" to Regex("""\d{7,10}-[a-f0-9]{16,32}""")
@@ -79,6 +80,7 @@ object ApiKeysBackupManager {
         val allKeysToExport = listOf(
             "gemini_key",
             "groq_key",
+            "openai_key",
             "pexels_key",
             "pixabay_key",
             "huggingface_key",
@@ -257,6 +259,7 @@ fun ApiKeysScreen(onBack: () -> Unit) {
     var azureSpeechRegion by remember { mutableStateOf(prefs.getString("azure_speech_region", "") ?: "") }
     var elevenLabsKey by remember { mutableStateOf(prefs.getString("elevenlabs_key", "") ?: "") }
     var firebaseKey by remember { mutableStateOf(prefs.getString("firebase_key", "") ?: "") }
+    var openaiKey by remember { mutableStateOf(prefs.getString("openai_key", "") ?: "") }
     
     var saveMessage by remember { mutableStateOf("") }
     var isSavingAndValidating by remember { mutableStateOf(false) }
@@ -274,16 +277,18 @@ fun ApiKeysScreen(onBack: () -> Unit) {
         imported["azure_speech_region"]?.let { azureSpeechRegion = it }
         imported["elevenlabs_key"]?.let { elevenLabsKey = it }
         imported["firebase_key"]?.let { firebaseKey = it }
+        imported["openai_key"]?.let { openaiKey = it }
     }
 
-    val currentKeysMap = remember(geminiKey, groqKey, pexelsKey, pixabayKey, huggingfaceKey, firebaseKey) {
+    val currentKeysMap = remember(geminiKey, groqKey, pexelsKey, pixabayKey, huggingfaceKey, firebaseKey, openaiKey) {
         mapOf(
             "gemini_key" to geminiKey,
             "groq_key" to groqKey,
             "pexels_key" to pexelsKey,
             "pixabay_key" to pixabayKey,
             "huggingface_key" to huggingfaceKey,
-            "firebase_key" to firebaseKey
+            "firebase_key" to firebaseKey,
+            "openai_key" to openaiKey
         )
     }
 
@@ -722,7 +727,20 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                         onValueChange = { groqKey = it }
                     )
                 }
-                
+
+                item {
+                    ApiKeyCard(
+                        serviceType = "openai",
+                        title = "2.5 OpenAI API (GPT)",
+                        description = "نماذج GPT للتوليد المتقدم والسكريبتات (بديل متوافق مع واجهة Groq — المفتاح يبدأ بـ sk-).",
+                        url = "https://platform.openai.com/api-keys",
+                        instructions = "1. ادخل إلى platform.openai.com/api-keys.\n2. أنشئ حساباً وانسخ المفتاح (يبدأ بـ sk-).\n3. الصقه هنا واحفظ.\n\nتنبيه أمني: المفتاح يُخزَّن محلياً في ذاكرة التطبيق فقط ويُرسل حصرياً إلى صفحات OpenAI الرسمية.",
+                        icon = Icons.Default.AutoAwesome,
+                        value = openaiKey,
+                        onValueChange = { openaiKey = it }
+                    )
+                }
+
                 item {
                     ApiKeyCard(
                         serviceType = "huggingface",
@@ -826,6 +844,7 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                                 .putString("azure_speech_key", azureSpeechKey.trim())
                                 .putString("azure_speech_region", azureSpeechRegion.trim())
                                 .putString("elevenlabs_key", elevenLabsKey.trim())
+                                .putString("openai_key", openaiKey.trim())
                                 .putString("firebase_key", firebaseKey.trim())
                                 .apply()
                             saveMessage = Translator.tr("تم حفظ وتحديث جميع المفاتيح بنجاح! ✨")
@@ -938,6 +957,7 @@ fun LiveHealthCheckPanel() {
         listOf(
             LiveServiceCheck("gemini", "Gemini (ذكاء اصطناعي)", "https://aistudio.google.com/app/apikey", prefs.getString("gemini_key", "").orEmpty(), freeFallback = "المحلل المحلي + استخراج المشاهد البلاغية يعملان بلا مفتاح"),
             LiveServiceCheck("groq", "Groq (نصوص فائقة السرعة)", "https://console.groq.com/keys", prefs.getString("groq_key", "").orEmpty(), freeFallback = "توليد النصوص يقع على المحرك المحلي و Gemini المجاني"),
+            LiveServiceCheck("openai", "OpenAI (نماذج GPT)", "https://platform.openai.com/api-keys", prefs.getString("openai_key", "").orEmpty(), freeFallback = "توليد النصوص يقع على المحرك المحلي و Gemini المجاني"),
             LiveServiceCheck("huggingface", "HuggingFace (صور AI)", "https://huggingface.co/settings/tokens", prefs.getString("huggingface_key", "").orEmpty(), freeFallback = "توليد الصور محلياً عبر LocalImageAnalyzer"),
             LiveServiceCheck("azure", "Azure TTS (نطق)", "https://portal.azure.com/#create/Microsoft.CognitiveServicesSpeechServices", prefs.getString("azure_speech_key", "").orEmpty(), prefs.getString("azure_speech_region", "").orEmpty(), freeFallback = "النطق المدمج في أندرويد (TextToSpeech) يعمل مجاناً دائماً"),
             LiveServiceCheck("elevenlabs", "ElevenLabs (نطق)", "https://elevenlabs.io/app/settings/api-keys", prefs.getString("elevenlabs_key", "").orEmpty(), freeFallback = "النطق المدمج في أندرويد (TextToSpeech) يعمل مجاناً دائماً"),

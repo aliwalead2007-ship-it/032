@@ -195,9 +195,8 @@ fun SettingsScreen(
 
     val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
     val userEmail = prefs.getString("user_email", "") ?: ""
-    val lowerEmail = userEmail.lowercase(java.util.Locale.ROOT)
-    val isAdmin = prefs.getBoolean("is_admin", false) || lowerEmail.contains("aly750834") || lowerEmail.contains("xman88371") || lowerEmail.contains("admin") || lowerEmail.contains("dev")
-    val isRelative = prefs.getBoolean("is_relative", false) || lowerEmail.contains("family") || lowerEmail.contains("friend") || lowerEmail == "peeesa7@gmail.com"
+    val isAdmin = prefs.getBoolean("is_admin", false)
+    val isRelative = prefs.getBoolean("is_relative", false)
     val isSelfSufficient = isAdmin || isRelative
     val isGuest = userEmail == "guest@qabas.studio" || userEmail.isBlank()
     

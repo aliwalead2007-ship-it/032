@@ -193,7 +193,7 @@ fun RegisterScreen(
 
                         if (success) {
                             val lowerEmail = trimmedEmail.lowercase(java.util.Locale.ROOT)
-                            val isAdmin = (lowerEmail == "admin@qabas.studio" || lowerEmail == "xman88371@gmail.com" || lowerEmail == "aly750834@gmail.com" || lowerEmail == "aliwalead.2007@gmail.com" || lowerEmail.contains("aliwalead") || lowerEmail.contains("admin") || lowerEmail.contains("dev"))
+                            val isAdmin = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE).getBoolean("is_admin", false)
                             
                             if (CloudServices.isFirebaseInitialized) {
                                 val userId = CloudServices.Auth.getCurrentUserId() ?: java.util.UUID.randomUUID().toString()
@@ -209,7 +209,7 @@ fun RegisterScreen(
                             prefs.edit().apply {
                                 putBoolean("is_logged_in", true)
                                 putBoolean("is_admin", isAdmin)
-                                putBoolean("is_developer", isAdmin)
+                                putBoolean("is_developer", prefs.getBoolean("is_developer", true))
                                 putBoolean("is_premium", true)
                                 putString("user_email", trimmedEmail)
                                 putString("user_name", name.trim())

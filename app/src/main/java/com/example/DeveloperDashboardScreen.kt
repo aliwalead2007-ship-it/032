@@ -48,7 +48,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 
-enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN }
+enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN, API_KEYS }
 
 data class DevUser(
     val id: String,
@@ -135,6 +135,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                             DashboardSection.DEV_PORTFOLIO_SHOWCASE -> "معرض وبروفايل أعمال المطور ✦"
                             DashboardSection.APP_DOCTOR -> "طبيب التطبيق 🩺"
                             DashboardSection.STYLE_BRAIN -> "عقل الأساليب 🧠"
+                            DashboardSection.API_KEYS -> "مفاتيح API 🔑"
                         }, 
                         color = GoldPrimary, 
                         fontWeight = FontWeight.Bold, 
@@ -273,6 +274,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                         onDevPortfolioShowcase = { currentSection = DashboardSection.DEV_PORTFOLIO_SHOWCASE },
                         onAppDoctor = { currentSection = DashboardSection.APP_DOCTOR },
                         onStyleBrain = { currentSection = DashboardSection.STYLE_BRAIN },
+                        onApiKeys = { currentSection = DashboardSection.API_KEYS },
                         userCount = devUsers.size
                     )
                 }
@@ -281,6 +283,9 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                 }
                 DashboardSection.STYLE_BRAIN -> {
                     StyleBrainSection(context = context)
+                }
+                DashboardSection.API_KEYS -> {
+                    ApiKeysScreen(onBack = { currentSection = DashboardSection.MAIN })
                 }
                 DashboardSection.DEV_PORTFOLIO_SHOWCASE -> {
                     DevPortfolioShowcaseScreen(context = context, onBack = { currentSection = DashboardSection.MAIN })
@@ -348,6 +353,7 @@ fun DashboardMainGrid(
     onDevPortfolioShowcase: () -> Unit,
 onAppDoctor: () -> Unit,
                         onStyleBrain: () -> Unit,
+                        onApiKeys: () -> Unit,
                         userCount: Int = 0
                     ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -459,7 +465,8 @@ onAppDoctor: () -> Unit,
             Triple("طلبات التطبيقات", Icons.Default.Build, onRequestSection),
             Triple("التحكم في النظام", Icons.Default.Settings, onSystemControls),
             Triple("سجل الانهيارات 🛡️", Icons.Default.BugReport, onCrashLogs),
-            Triple("إعدادات حساب المطور", Icons.Default.ManageAccounts, onAccountSettings)
+            Triple("إعدادات حساب المطور", Icons.Default.ManageAccounts, onAccountSettings),
+            Triple("مفاتيح API 🔑", Icons.Default.VpnKey, onApiKeys)
         )
 
         LazyVerticalGrid(

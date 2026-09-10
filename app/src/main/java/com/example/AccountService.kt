@@ -23,13 +23,7 @@ class AccountService(private val context: Context) {
             val qabasPrefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
             val isAdmin = qabasPrefs.getBoolean("is_admin", false)
             val isDev = qabasPrefs.getBoolean("is_developer", true) // Default developer mode enabled
-            val userEmail = qabasPrefs.getString("user_email", "")?.lowercase(Locale.ROOT) ?: ""
-            val isDevEmail = userEmail.contains("aly750834") || 
-                             userEmail.contains("aliwalead") || 
-                             userEmail.contains("xman88371") || 
-                             userEmail.contains("admin") || 
-                             userEmail.contains("dev")
-            return isAdmin || isDev || isDevEmail
+            return isAdmin || isDev
         }
 
     val hasCustomKeys: Boolean

@@ -904,6 +904,55 @@ object RealGroqService {
     }
 }
 
+object RealOpenAIService {
+    private val client = OkHttpClient()
+
+    suspend fun chatOrGenerate(prompt: String): String? = withContext(Dispatchers.IO) {
+        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
+        var apiKey = prefs.getString("openai_key", "")?.trim().orEmpty()
+        if (apiKey.isBlank()) {
+            apiKey = BuildConfig.OPENAI_API_KEY.takeIf { it.isNotBlank() && it != "your_key" }.orEmpty()
+        }
+        if (apiKey.isBlank()) return@withContext null
+
+        try {
+            val jsonBody = JSONObject().apply {
+                put("model", "gpt-4o-mini")
+                put("messages", JSONArray().apply {
+                    put(JSONObject().apply {
+                        put("role", "system")
+                        put("content", "أنت مساعد ذكي متخصص في صناعة المحتوى الإسلامي والدعوي الهادف.")
+                    })
+                    put(JSONObject().apply {
+                        put("role", "user")
+                        put("content", prompt)
+                    })
+                })
+                put("temperature", 0.7)
+            }
+
+            val request = Request.Builder()
+                .url("https://api.openai.com/v1/chat/completions")
+                .addHeader("Authorization", "Bearer $apiKey")
+                .post(jsonBody.toString().toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val response = ApiUsageTracker.track(AppServices.appContext, "OpenAI") { client.newCall(request).execute() }
+            if (response.isSuccessful) {
+                val resObj = JSONObject(response.body?.string() ?: "")
+                val choices = resObj.optJSONArray("choices")
+                if (choices != null && choices.length() > 0) {
+                    val message = choices.getJSONObject(0).optJSONObject("message")
+                    return@withContext message?.optString("content")
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return@withContext null
+    }
+}
+
 object RealHuggingFaceService {
     private val client = OkHttpClient()
 
@@ -1345,6 +1394,8 @@ object AppServices {
         customSystemInstruction: String? = null
     ): String {
         if (messages.size == 1 && customSystemInstruction.isNullOrBlank()) {
+            val openaiResponse = RealOpenAIService.chatOrGenerate(messages[0].second)
+            if (!openaiResponse.isNullOrBlank()) return openaiResponse
             val fastResponse = RealGroqService.chatOrGenerate(messages[0].second)
             if (!fastResponse.isNullOrBlank()) return fastResponse
         }
@@ -1352,6 +1403,8 @@ object AppServices {
     }
 
     private suspend fun executeShortTaskWithFallback(prompt: String): String {
+        val openaiResponse = RealOpenAIService.chatOrGenerate(prompt)
+        if (!openaiResponse.isNullOrBlank()) return openaiResponse
         val fastResponse = RealGroqService.chatOrGenerate(prompt)
         if (!fastResponse.isNullOrBlank()) return fastResponse
         return RealGeminiService.chatWithAssistant(listOf(Pair(true, prompt)), null)

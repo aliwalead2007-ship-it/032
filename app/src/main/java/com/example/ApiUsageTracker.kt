@@ -23,7 +23,7 @@ object ApiUsageTracker {
      * تسمية موحدة للخدمات المستخدمة في لوحة المطور.
      */
     val SUPPORTED: List<String> = listOf(
-        "Gemini", "Groq", "Azure TTS", "ElevenLabs", "HuggingFace", "Pexels", "Pixabay", "Firebase"
+        "Gemini", "Groq", "OpenAI", "Azure TTS", "ElevenLabs", "HuggingFace", "Pexels", "Pixabay", "Firebase"
     )
 
     data class ApiStat(

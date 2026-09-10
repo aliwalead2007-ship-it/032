@@ -183,9 +183,7 @@ object LeagueService {
                 }
             } else {
                 // التأكد من إزالة الصلاحية إن لم يكن لديه مكافأة (إلا إذا كان قريباً فعلاً)
-                val isActuallyRelative = prefs.getString("user_email", "")?.let {
-                    it == "family@qabas.studio" || it == "friend@qabas.studio" || it == "peeesa7@gmail.com"
-                } ?: false
+                val isActuallyRelative = prefs.getBoolean("is_relative", false)
                 
                 if (!isActuallyRelative) {
                     editor.putBoolean("is_relative", false)
