@@ -11,11 +11,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.qabas.app"
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.example.fbviki"
+    applicationId = "com.qabas.app"
     minSdk = 24
     targetSdk = 36
     versionCode = 2
