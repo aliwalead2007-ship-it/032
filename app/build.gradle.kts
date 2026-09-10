@@ -11,7 +11,7 @@ plugins {
 }
 
 android {
-  namespace = "com.qabas.app"
+  namespace = "com.example"
   compileSdk = 36
 
   defaultConfig {
