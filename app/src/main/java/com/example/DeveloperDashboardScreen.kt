@@ -1786,15 +1786,25 @@ fun FirebaseStorageCapacityCard(context: Context) {
         try {
             context.cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
         } catch (e: Exception) {
-            12_500_000L
+            0L
         }
     }
     val cacheMB = (cacheBytes / (1024.0 * 1024.0)).coerceAtLeast(0.5)
 
+    // Real local data & database usage (no fabricated numbers)
+    val dataBytes = remember {
+        try {
+            (context.filesDir.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L) +
+                (context.getDatabasePath("qabas.db").length())
+        } catch (e: Exception) {
+            0L
+        }
+    }
+    val dataMB = dataBytes / (1024.0 * 1024.0)
+
     // Firebase Free Tier Specs
     val maxFreeStorageMB = 1024.0 // 1 GB free
-    val estDatabaseMB = if (isFirebaseActive) 18.4 else 2.1
-    val totalUsedMB = (cacheMB + estDatabaseMB).coerceAtMost(maxFreeStorageMB)
+    val totalUsedMB = (cacheMB + dataMB).coerceAtMost(maxFreeStorageMB)
     val remainingMB = maxFreeStorageMB - totalUsedMB
     val remainingPercentage = ((remainingMB / maxFreeStorageMB) * 100).toInt()
     val usedPercentageRatio = (totalUsedMB / maxFreeStorageMB).toFloat()
@@ -1901,6 +1911,14 @@ fun FirebaseStorageCapacityCard(context: Context) {
                 }
                 Text(String.format("%.1f MB", cacheMB), color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                "ملاحظة صادقة: استهلاك Firebase السحابي لا يُقاس محلياً؛ الأرقام المعروضة قياس فعلي لملفات التطبيق وقاعدة البيانات والكاش على هذا الجهاز.",
+                color = Color(0xFF64748B),
+                fontFamily = NotoSansFont,
+                fontSize = 11.sp
+            )
         }
     }
 }
