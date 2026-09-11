@@ -155,7 +155,25 @@ object CloudServices {
                 auth.signOut()
             }
         }
-    }
+
+        /** synchronizes is_admin flag with Firebase Auth custom claim */
+        // Note: caller must pass the application Context, e.g. CloudServices.syncAdminClaimFromFirebase(context)
+        suspend fun syncAdminClaimFromFirebase(context: Context) {
+            if (!isFirebaseInitialized) return
+            try {
+                val user = auth.currentUser
+                if (user == null) return
+                val claims = user.customClaims
+                val isAdminFromFirebase = claims.get("admin") as? Boolean ?: false
+                // update local prefs
+                val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
+                prefs.edit().putBoolean("is_admin", isAdminFromFirebase).apply()
+                // update in-memory state if needed
+                // (callers should also read from prefs or use CloudServices.isAdmin)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to sync admin claim: ${e.message}")
+            }
+        }
 
     // --- خدمة قاعدة البيانات (Firestore) ---
     object Database {

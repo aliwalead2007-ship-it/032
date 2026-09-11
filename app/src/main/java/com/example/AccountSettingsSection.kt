@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.coroutine.rememberCoroutineScope
+import androidx.lifecycle.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,6 +42,7 @@ fun AccountSettingsSection(context: Context) {
     var isTransactionNotificationsEnabled by remember {
         mutableStateOf(prefs.getBoolean("dev_transaction_notifications", false))
     }
+    var isAdmin by remember { mutableStateOf(prefs.getBoolean("is_admin", false)) }
 
     Column(
         modifier = Modifier
@@ -220,6 +223,51 @@ fun AccountSettingsSection(context: Context) {
                 },
                 colors = SwitchDefaults.colors(checkedThumbColor = GoldPrimary, checkedTrackColor = GoldSecondary)
             )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("الرتبة الإدارية", color = Color.White, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("تحديد ما إذا كان الحساب الحالي لديه صلاحيات إدارية.", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 12.sp)
+            }
+            Switch(
+                checked = isAdmin,
+                onCheckedChange = {
+                    isAdmin = it
+                    prefs.edit().putBoolean("is_admin", it).apply()
+                },
+                colors = SwitchDefaults.colors(checkedThumbColor = GoldPrimary, checkedTrackColor = GoldSecondary)
+            )
+        }
+
+        // Sync with Firebase custom claim
+        Button(
+            onClick = {
+                try {
+                    // We need application context; get it from LocalContext
+                    val ctx = LocalContext.current
+                    // Launch coroutine scope via remember
+                    val scope = rememberCoroutineScope()
+                    scope.launch {
+                        CloudServices.syncAdminClaimFromFirebase(ctx)
+                        // Refresh local state after sync
+                        isAdmin = prefs.getBoolean("is_admin", false)
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(ctx, "فشل同步: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+            },
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(10.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
+        ) {
+            Text("تنزيل من فايربيس", color = Color.Black, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
 
         Spacer(modifier = Modifier.height(8.dp))
