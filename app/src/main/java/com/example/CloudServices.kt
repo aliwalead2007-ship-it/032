@@ -101,7 +101,7 @@ object CloudServices {
 
     // --- خدمة المصادقة (Authentication) ---
     object Auth {
-        private val auth by lazy { FirebaseAuth.getInstance() }
+        val auth by lazy { FirebaseAuth.getInstance() }
         
         private val _currentUser = MutableStateFlow<FirebaseUser?>(null)
         val currentUser: StateFlow<FirebaseUser?> = _currentUser.asStateFlow()
@@ -156,25 +156,23 @@ object CloudServices {
             }
         }
 
+    }
+
         /** synchronizes is_admin flag with Firebase Auth custom claim */
-        // Note: caller must pass the application Context, e.g. CloudServices.syncAdminClaimFromFirebase(context)
         suspend fun syncAdminClaimFromFirebase(context: Context) {
             if (!isFirebaseInitialized) return
             try {
-                val user = auth.currentUser
+                val user = Auth.auth.currentUser
                 if (user == null) return
                 val claims = user.getIdToken(false).await().claims
                 val isAdminFromFirebase = claims["admin"] as? Boolean ?: false
                 // update local prefs
                 val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
                 prefs.edit().putBoolean("is_admin", isAdminFromFirebase).apply()
-                // update in-memory state if needed
-                // (callers should also read from prefs or use CloudServices.isAdmin)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to sync admin claim: ${e.message}")
             }
         }
-    }
 
     // --- خدمة قاعدة البيانات (Firestore) ---
     object Database {
