@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -41,6 +42,38 @@ data class ClientRetainer(
     val deliveryProgress: Float // 0.0f to 1.0f
 )
 
+private const val CLIENTS_PREFS_KEY = "agency_clients_json"
+
+private fun encodeClientsPrefs(clients: List<ClientRetainer>): String = buildString {
+    for (c in clients) {
+        append(c.clientName).append('\u0001')
+        append(c.serviceType).append('\u0001')
+        append(c.monthlyAmount).append('\u0001')
+        append(c.paymentStatus).append('\u0001')
+        append(c.deliveryProgress).append('\n')
+    }
+}
+
+private fun loadClientsPrefs(prefs: android.content.SharedPreferences): List<ClientRetainer> {
+    val raw = prefs.getString(CLIENTS_PREFS_KEY, null) ?: return emptyList()
+    val list = mutableListOf<ClientRetainer>()
+    for (line in raw.lineSequence()) {
+        if (line.isBlank()) continue
+        val parts = line.split('\u0001')
+        if (parts.size < 5) continue
+        list.add(
+            ClientRetainer(
+                clientName = parts[0],
+                serviceType = parts[1],
+                monthlyAmount = parts[2].toDoubleOrNull() ?: 0.0,
+                paymentStatus = parts[3],
+                deliveryProgress = (parts[4].toFloatOrNull() ?: 0f).coerceIn(0f, 1f)
+            )
+        )
+    }
+    return list
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AgencyMonetizationHub(context: Context) {
@@ -54,16 +87,12 @@ fun AgencyMonetizationHub(context: Context) {
     var clientLogoName by remember { mutableStateOf("") }
     var generatedQuoteText by remember { mutableStateOf("") }
 
-    // Client Retainers
-    var clientsList by remember {
-        mutableStateOf(
-            listOf(
-                ClientRetainer(clientName = "قناة هداية الدعوية", serviceType = "باقة 30 فيديو Reels", monthlyAmount = 600.0, paymentStatus = "مدفوع 🟢", deliveryProgress = 0.8f),
-                ClientRetainer(clientName = "جمعية البر والتقوى", serviceType = "تطبيق مخصص White-Label", monthlyAmount = 1500.0, paymentStatus = "مدفوع 🟢", deliveryProgress = 1.0f),
-                ClientRetainer(clientName = "منصة تدبر القرآن", serviceType = "باقة السكربتات والتعليق الصوتي", monthlyAmount = 350.0, paymentStatus = "معلق 🟡", deliveryProgress = 0.4f)
-            )
-        )
-    }
+    // Client Retainers (persisted in qabas_prefs — no fake seeds)
+    val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
+    var clientsList by remember { mutableStateOf(loadClientsPrefs(prefs)) }
+    var newClientName by remember { mutableStateOf("") }
+    var newClientService by remember { mutableStateOf("") }
+    var newClientAmount by remember { mutableStateOf("") }
 
     LazyColumn(
         modifier = Modifier
@@ -341,7 +370,92 @@ fun AgencyMonetizationHub(context: Context) {
                 }
             }
 
-            items(clientsList) { client ->
+            if (clientsList.isEmpty()) {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color(0xFF1E293B)),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("لا توجد عقود مسجلة بعد", color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("أضف أول عميل من البطاقة بالأسفل — البيانات تُحفظ على جهازك حصرياً.", color = TextSecondary, fontFamily = CairoFont, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = CardSurface),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color(0xFF1E293B)),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text("إضافة عميل جديد", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = newClientName,
+                            onValueChange = { newClientName = it },
+                            label = { Text("اسم العميل", color = Color.Gray, fontFamily = CairoFont) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GoldPrimary, unfocusedBorderColor = Color(0xFF1E293B), focusedTextColor = Color.White),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newClientService,
+                            onValueChange = { newClientService = it },
+                            label = { Text("نوع الخدمة", color = Color.Gray, fontFamily = CairoFont) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GoldPrimary, unfocusedBorderColor = Color(0xFF1E293B), focusedTextColor = Color.White),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = newClientAmount,
+                            onValueChange = { newClientAmount = it },
+                            label = { Text("المبلغ الشهري بالدولار", color = Color.Gray, fontFamily = CairoFont) },
+                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = GoldPrimary, unfocusedBorderColor = Color(0xFF1E293B), focusedTextColor = Color.White),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                val amount = newClientAmount.trim().toDoubleOrNull()
+                                if (newClientName.isNotBlank() && newClientService.isNotBlank() && amount != null && amount > 0) {
+                                    val updated = clientsList + ClientRetainer(
+                                        clientName = newClientName.trim(),
+                                        serviceType = newClientService.trim(),
+                                        monthlyAmount = amount,
+                                        paymentStatus = "معلق 🟡",
+                                        deliveryProgress = 0.0f
+                                    )
+                                    clientsList = updated
+                                    prefs.edit().putString(CLIENTS_PREFS_KEY, encodeClientsPrefs(updated)).apply()
+                                    newClientName = ""
+                                    newClientService = ""
+                                    newClientAmount = ""
+                                } else {
+                                    Toast.makeText(context, "أكمل جميع الحقول بمبلغ صحيح (أكبر من صفر)", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = newClientName.isNotBlank() && newClientService.isNotBlank() && newClientAmount.isNotBlank(),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
+                        ) {
+                            Text("إضافة العميل", color = Color(0xFF0B1120), fontFamily = CairoFont, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            items(clientsList, key = { it.id }) { client ->
                 Card(
                     colors = CardDefaults.cardColors(containerColor = CardSurface),
                     shape = RoundedCornerShape(12.dp),
@@ -358,7 +472,16 @@ fun AgencyMonetizationHub(context: Context) {
                                 Text(client.clientName, color = Color.White, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                 Text(client.serviceType, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 12.sp)
                             }
-                            Text("$${client.monthlyAmount}", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("$${client.monthlyAmount}", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                IconButton(onClick = {
+                                    val updated = clientsList.filterNot { it.id == client.id }
+                                    clientsList = updated
+                                    prefs.edit().putString(CLIENTS_PREFS_KEY, encodeClientsPrefs(updated)).apply()
+                                }) {
+                                    Icon(Icons.Default.Close, contentDescription = "حذف العميل", tint = Color(0xFFE11D48), modifier = Modifier.size(16.dp))
+                                }
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))

@@ -14,10 +14,7 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 object SystemLogsManager {
-    val logs = mutableStateListOf<SystemLogEntry>(
-        SystemLogEntry(level = "INFO", message = "تم تهيئة لوحة المطور وتصفير الأمثلة السابقة بنجاح", time = "الآن", color = Color.Green),
-        SystemLogEntry(level = "INFO", message = "نظام الذكاء الاصطناعي (Gemini) جاهز للاستجابة", time = "الآن", color = Color(0xFFE8C547))
-    )
+    val logs = mutableStateListOf<SystemLogEntry>()
 
     fun addLog(level: String, message: String, color: Color = Color.Green) {
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())

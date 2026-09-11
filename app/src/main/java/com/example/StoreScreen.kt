@@ -33,7 +33,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class StoreItemType { PRO_SUB, COINS }
@@ -71,6 +70,14 @@ fun StoreScreen(onBack: () -> Unit) {
     var balance by remember { mutableIntStateOf(accountService.walletBalance) }
     var isUserPremium by remember { mutableStateOf(accountService.isPremium || accountService.isDeveloperOrAdmin || accountService.hasCustomKeys) }
 
+    var showPurchaseDialog by remember { mutableStateOf<StoreItem?>(null) }
+    var isProcessingPurchase by remember { mutableStateOf(false) }
+
+    fun resetPurchaseState() {
+        isProcessingPurchase = false
+        showPurchaseDialog = null
+    }
+
     // Set callbacks
     DisposableEffect(billingManager) {
         billingManager.onPurchaseSuccess = { productId ->
@@ -84,23 +91,24 @@ fun StoreScreen(onBack: () -> Unit) {
                     accountService.isPremium = true
                     isUserPremium = true
                 }
-                coroutineScope.launch {
-                    CloudServices.Database.recordPurchase(purchasedItem.id, "qabas_receipt_${System.currentTimeMillis()}")
-                }
                 android.widget.Toast.makeText(context, "تمت عملية الشراء بنجاح! 🎉", android.widget.Toast.LENGTH_LONG).show()
             }
+            resetPurchaseState()
         }
         billingManager.onPurchaseCanceled = {
             android.widget.Toast.makeText(context, "تم إلغاء عملية الشراء", android.widget.Toast.LENGTH_SHORT).show()
+            resetPurchaseState()
+        }
+        billingManager.onPurchaseError = { errorMessage ->
+            android.widget.Toast.makeText(context, "فشل إتمام عملية الشراء: $errorMessage", android.widget.Toast.LENGTH_LONG).show()
+            resetPurchaseState()
         }
         onDispose {
             billingManager.onPurchaseSuccess = null
             billingManager.onPurchaseCanceled = null
+            billingManager.onPurchaseError = null
         }
     }
-    
-    var showPurchaseDialog by remember { mutableStateOf<StoreItem?>(null) }
-    var isProcessingPurchase by remember { mutableStateOf(false) }
 
     showPurchaseDialog?.let { item ->
         AlertDialog(
@@ -147,33 +155,29 @@ fun StoreScreen(onBack: () -> Unit) {
                             isProcessingPurchase = true
                             val activity = context as? Activity
                             if (activity != null) {
-                                // محاولة إطلاق نافذة الدفع الحقيقية لجوجل
-                                // إذا لم تكن المنتجات مجهزة في Google Play Console أو أننا في المحاكي،
-                                // ستفشل العملية بهدوء (سيعطي error في الـ log).
-                                billingManager.launchBillingFlow(activity, item.id)
-                                
-                                // للمحاكاة أثناء التطوير (بما أننا في محاكي بدون حساب جوجل بلاي)
-                                // يتم تفعيلها هنا فقط إذا أردنا إكمال الشراء كـ Test. 
-                                // في الإنتاج الفعلي، سنعتمد على onPurchaseSuccess في الأعلى.
-                                coroutineScope.launch {
-                                    delay(1000)
-                                    val mockToken = "qabas_receipt_${System.currentTimeMillis()}"
-                                    val isVerified = PurchaseValidator.verifyPurchase(item.id, mockToken)
-                                    if (isVerified) {
-                                        if (item.type == StoreItemType.COINS) {
-                                            val newBalance = balance + item.amount
-                                            accountService.walletBalance = newBalance
-                                            balance = newBalance
-                                        } else {
-                                            accountService.isPremium = true
+                                billingManager.launchBillingFlow(
+                                    activity = activity,
+                                    productId = item.id,
+                                    onFallbackSuccess = {
+                                        val purchasedItem = storeItems.find { it.id == item.id }
+                                        if (purchasedItem != null) {
+                                            if (purchasedItem.type == StoreItemType.COINS) {
+                                                val newBalance = accountService.walletBalance + purchasedItem.amount
+                                                accountService.walletBalance = newBalance
+                                                balance = newBalance
+                                            } else {
+                                                accountService.isPremium = true
+                                                isUserPremium = true
+                                            }
+                                            android.widget.Toast.makeText(context, "تمت عملية الشراء بنجاح! 🎉", android.widget.Toast.LENGTH_LONG).show()
                                         }
-                                        android.widget.Toast.makeText(context, "تمت عملية الشراء بنجاح! 🎉", android.widget.Toast.LENGTH_LONG).show()
-                                    } else {
-                                        android.widget.Toast.makeText(context, "فشل التحقق من عملية الشراء (حاول مرة أخرى)", android.widget.Toast.LENGTH_LONG).show()
+                                        resetPurchaseState()
                                     }
-                                    isProcessingPurchase = false
-                                    showPurchaseDialog = null
-                                }
+                                )
+                                android.widget.Toast.makeText(context, "جارٍ فتح نافذة الدفع…", android.widget.Toast.LENGTH_SHORT).show()
+                            } else {
+                                isProcessingPurchase = false
+                                android.widget.Toast.makeText(context, "لا يمكن فتح نافذة الدفع على هذا الجهاز", android.widget.Toast.LENGTH_LONG).show()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)

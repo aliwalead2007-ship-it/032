@@ -927,6 +927,8 @@ fun NotificationsSection(context: Context) {
             }
         }
 
+        Text("⭐ الإشعارات تُرسل محلياً على هذا الجهاز حصرياً — لا توجد قناة دفع/إشعارات سحابية بعد.", color = TextSecondary, fontFamily = CairoFont, fontSize = 12.sp)
+
         if (sentNotifications.isEmpty()) {
             Text("لا توجد إشعارات مرسلة حالياً", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 14.sp)
         } else {

@@ -37,7 +37,6 @@ import com.example.ui.theme.*
 import com.example.ui.theme.DeepSlate
 import com.example.ui.theme.GoldPrimary
 import com.example.ui.theme.NotoSansFont
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -459,6 +458,7 @@ fun ThumbnailGeneratorDialog(onDismiss: () -> Unit) {
     var suggestedTitles by remember { mutableStateOf<List<String>>(emptyList()) }
     var isGenerating by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -471,7 +471,7 @@ fun ThumbnailGeneratorDialog(onDismiss: () -> Unit) {
                 modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(Translator.tr("صانع الصور المصغرة والعناوين"), color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                Text(Translator.tr("مولّد العناوين والأفكار"), color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 22.sp)
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(Translator.tr("ارفع نسبة النقر إلى الظهور (CTR) من خلال عناوين وصور مصغرة احترافية."), color = Color.Gray, fontFamily = NotoSansFont, fontSize = 14.sp, textAlign = TextAlign.Center)
                 
@@ -496,14 +496,22 @@ fun ThumbnailGeneratorDialog(onDismiss: () -> Unit) {
                 Button(
                     onClick = {
                         isGenerating = true
+                        generatedImage = null
+                        suggestedTitles = emptyList()
                         scope.launch {
-                            delay(2000) // Mock API call
-                            generatedImage = "https://picsum.photos/800/450?random=yt"
-                            suggestedTitles = listOf(
-                                "سر عظيم في الصدقة يغفل عنه الكثيرون!",
-                                "كيف تغير الصدقة حياتك؟ (قصص واقعية)",
-                                "الصدقة: استثمارك الحقيقي في الآخرة"
-                            )
+                            val titlesText = runCatching { AppServices.generateTitles(prompt) }.getOrDefault("")
+                            val titles = titlesText
+                                .lineSequence()
+                                .map { it.trim().trimStart('1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '.', ')', '-', '•') }
+                                .filter { it.isNotBlank() && it.length >= 8 }
+                                .take(3)
+                                .toList()
+                            if (titles.isEmpty()) {
+                                generatedImage = null
+                                android.widget.Toast.makeText(context, "تعذر توليد عناوين حقيقية حالياً — حاول مجدداً", android.widget.Toast.LENGTH_LONG).show()
+                            } else {
+                                suggestedTitles = titles
+                            }
                             isGenerating = false
                         }
                     },
@@ -517,22 +525,12 @@ fun ThumbnailGeneratorDialog(onDismiss: () -> Unit) {
                     } else {
                         Icon(Icons.Default.AutoFixHigh, contentDescription = null, tint = DeepSlate)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(Translator.tr("توليد الصورة والعناوين"), color = DeepSlate, fontFamily = CairoFont, fontWeight = FontWeight.Bold)
+                        Text(Translator.tr("توليد العناوين"), color = DeepSlate, fontFamily = CairoFont, fontWeight = FontWeight.Bold)
                     }
                 }
                 
-                if (generatedImage != null) {
+                if (suggestedTitles.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(24.dp))
-                    Text(Translator.tr("الصورة المصغرة المقترحة:"), color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
-                    Spacer(modifier = Modifier.height(8.dp))
-                    AsyncImage(
-                        model = generatedImage,
-                        contentDescription = "Thumbnail",
-                        modifier = Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(12.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                    
-                    Spacer(modifier = Modifier.height(16.dp))
                     Text(Translator.tr("العناوين المقترحة:"), color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
                     Spacer(modifier = Modifier.height(8.dp))
                     suggestedTitles.forEach { title ->
@@ -550,6 +548,30 @@ fun ThumbnailGeneratorDialog(onDismiss: () -> Unit) {
                             Text(title, color = Color.White, fontFamily = NotoSansFont, fontSize = 14.sp)
                         }
                     }
+                }
+
+                if (generatedImage != null) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(Translator.tr("الصورة المصغرة المقترحة:"), color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.Start))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AsyncImage(
+                        model = generatedImage,
+                        contentDescription = "Thumbnail",
+                        modifier = Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
+                if (!isGenerating && suggestedTitles.isEmpty() && prompt.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        Translator.tr("توليد الصور المصغرة بالذكاء الاصطناعي غير متاح حالياً — تُولَّد العناوين فقط."),
+                        color = Color.Gray,
+                        fontFamily = CairoFont,
+                        fontSize = 12.sp,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
