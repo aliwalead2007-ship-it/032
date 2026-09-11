@@ -561,18 +561,6 @@ fun ProfileScreen(
                             Spacer(modifier = Modifier.width(6.dp))
                             Text("المتجر والترقية 👑", color = DeepSlate, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
-
-                        OutlinedButton(
-                            onClick = { onNavigate(AppState.API_KEYS) },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF38BDF8)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF38BDF8)),
-                            shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).height(40.dp)
-                        ) {
-                            Icon(Icons.Default.Key, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("مفاتيح الـ AI 🔑", color = Color(0xFF38BDF8), fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
                     }
                 }
             }

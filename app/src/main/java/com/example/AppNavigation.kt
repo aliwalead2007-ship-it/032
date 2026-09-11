@@ -320,7 +320,6 @@ fun AppNavigation(
                     viewModel.updateState { copy(appState = AppState.LOGIN) }
                 },
                 onBack = { viewModel.updateState { copy(appState = AppState.HOME) } },
-                onNavigateToApiKeys = { viewModel.updateState { copy(appState = AppState.API_KEYS) } },
                 onNavigateToTasteProfile = { viewModel.updateState { copy(appState = AppState.TASTE_PROFILE) } },
                 onNavigateToPremiumUpgrade = { viewModel.updateState { copy(appState = AppState.PREMIUM_UPGRADE) } },
                 bottomBar = bottomNav
@@ -393,11 +392,6 @@ fun AppNavigation(
                         )
                     }
                 }
-            )
-        }
-        AppState.API_KEYS -> {
-            ApiKeysScreen(
-                onBack = { viewModel.updateState { copy(appState = AppState.SETTINGS) } }
             )
         }
         AppState.LEADERBOARD -> {

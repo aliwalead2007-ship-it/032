@@ -38,7 +38,6 @@ import com.example.ui.theme.*
 fun SettingsScreen(
     onBack: () -> Unit, 
     onLogout: () -> Unit, 
-    onNavigateToApiKeys: () -> Unit = {}, 
     onNavigateToTasteProfile: () -> Unit = {}, 
     onNavigateToPremiumUpgrade: () -> Unit = {}, 
     bottomBar: @Composable () -> Unit = {}
@@ -321,72 +320,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 2. API Keys & Operational Readiness Section
-            val settingsReadiness = remember { OperationalReadinessManager.calculateReadiness(context) }
-            CollapsibleSettingsCard(
-                title = Translator.tr("مفاتيح الخدمات والجاهزية التشغيلية"),
-                icon = Icons.Default.VpnKey,
-                sectionKey = "settings_api_keys"
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = Translator.tr("نسبة الجاهزية الحالية: ") + "${settingsReadiness.percentage}%",
-                            color = GoldPrimary,
-                            fontFamily = CairoFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = settingsReadiness.statusTitle,
-                            color = TextSecondary,
-                            fontFamily = CairoFont,
-                            fontSize = 12.sp
-                        )
-                    }
-                    Surface(
-                        color = GoldPrimary.copy(alpha = 0.15f),
-                        shape = CircleShape,
-                        border = androidx.compose.foundation.BorderStroke(1.5.dp, GoldPrimary)
-                    ) {
-                        Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "${settingsReadiness.percentage}%",
-                                color = GoldPrimary,
-                                fontFamily = CairoFont,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = Translator.tr("يمكنك إضافة وتحديث مفاتيح الخدمات (Gemini, Groq, Azure, ElevenLabs, Pexels) لتشغيل المحركات الحية بأعلى كفاءة."),
-                    color = TextSecondary,
-                    fontFamily = CairoFont,
-                    fontSize = 12.sp,
-                    lineHeight = 18.sp
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(
-                    onClick = onNavigateToApiKeys,
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF151B2B)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(Icons.Default.Key, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(Translator.tr("إدارة وإضافة مفاتيح الخدمات (API Keys)"), color = GoldPrimary, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-            }
-
-            // 3. AI Automation & Taste Profile Collapsible Section
+            // 2. AI Automation & Taste Profile Collapsible Section
             CollapsibleSettingsCard(
                 title = Translator.tr("هوية الاستوديو والذكاء الاصطناعي"),
                 icon = Icons.Default.Psychology,
@@ -440,7 +374,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 4. General Settings & Export Quality Collapsible Section
+            // 3. General Settings & Export Quality Collapsible Section
             CollapsibleSettingsCard(
                 title = Translator.tr("التفضيلات والجودة والتصدير"),
                 icon = Icons.Default.Tune,
@@ -579,7 +513,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 5. Official Accounts Collapsible Section (الحسابات الرسمية)
+            // 4. Official Accounts Collapsible Section (الحسابات الرسمية)
             val officialChannels = remember { SocialAccountManager.getOfficialChannels(context) }
             CollapsibleSettingsCard(
                 title = Translator.tr("الحسابات الرسمية"),
@@ -608,7 +542,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 6. Social Media Accounts Collapsible Section (ربط المنصات الاجتماعية والنشر)
+            // 5. Social Media Accounts Collapsible Section (ربط المنصات الاجتماعية والنشر)
             CollapsibleSettingsCard(
                 title = Translator.tr("ربط المنصات الاجتماعية والنشر"),
                 icon = Icons.Default.Share,
@@ -643,7 +577,7 @@ fun SettingsScreen(
                 }
             }
 
-            // 7. About & Platform Info Collapsible Section
+            // 6. About & Platform Info Collapsible Section
             CollapsibleSettingsCard(
                 title = Translator.tr("حول تطبيق قبس والمعلومات"),
                 icon = Icons.Default.Info,
