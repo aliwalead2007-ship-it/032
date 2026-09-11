@@ -326,20 +326,45 @@ class VideoEngineManager(private val context: Context) {
                 else -> "Dissolve"
             }
             val rawConcatPath = File(cacheDir, "raw_concat_output.mp4").absolutePath
-            val concatSuccess = if (deviceProfile.isLowEnd) {
+            // تصفية المشاهد الصالحة فقط قبل الدمج — ملف غير صالح واحد يفشل السلسلة كلها
+            val validPaths = processedVideoPaths.filter { VideoProcessor.isValidVideoFile(it, minSizeBytes = 5_000L) }
+            if (validPaths.isEmpty()) {
+                SystemLogsManager.addLog(
+                    "ERROR",
+                    "لا يوجد أي مشهد صالح للدمج — فشل التصدير 🔴",
+                    Color(0xFFEF4444)
+                )
+                return@withContext null
+            }
+            var concatSuccess = if (deviceProfile.isLowEnd) {
                 // Stream-copy concat without heavy filter graph re-encoding to save memory
-                VideoProcessor.concatenateVideos(context, processedVideoPaths, rawConcatPath)
+                VideoProcessor.concatenateVideos(context, validPaths, rawConcatPath)
             } else {
                 VideoProcessor.concatenateVideosWithTransitions(
                     context = context,
-                    videoPaths = processedVideoPaths,
+                    videoPaths = validPaths,
                     transitionType = styleTransition,
                     outputPath = rawConcatPath
                 )
             }
-            
+
+            // دمج بديل بسيط بلا انتقالات عند فشل الدمج السينمائي — أولوية للإنتاج على الجمال
             if (!concatSuccess) {
+                SystemLogsManager.addLog(
+                    "WARN",
+                    "فشل الدمج بالانتقالات — إعادة المحاولة بدمج مباشر بلا انتقالات",
+                    Color(0xFFE8C547)
+                )
+                concatSuccess = VideoProcessor.concatenateVideos(context, validPaths, rawConcatPath)
+            }
+
+            if (!concatSuccess || !VideoProcessor.isValidVideoFile(rawConcatPath, minSizeBytes = 8_000L)) {
                 Log.e(TAG, "Failed to concatenate videos")
+                SystemLogsManager.addLog(
+                    "ERROR",
+                    "فشل دمج المشاهد نهائياً حتى بالدمج المباشر — فشل التصدير 🔴",
+                    Color(0xFFEF4444)
+                )
                 return@withContext null
             }
 
@@ -636,7 +661,7 @@ class VideoEngineManager(private val context: Context) {
             } catch (t: Throwable) {
                 Log.e(TAG, "Error generating procedural backdrop for scene $index", t)
             }
-            val ok = VideoProcessor.generateVideoFromImage(
+            var ok = VideoProcessor.generateVideoFromImage(
                 context,
                 imgFile.absolutePath,
                 safeDuration,
@@ -644,10 +669,36 @@ class VideoEngineManager(private val context: Context) {
                 styleAnalysis
             )
             if (!ok || !VideoProcessor.isValidVideoFile(out.absolutePath, minSizeBytes = 5_000L)) {
-                Log.e(TAG, "generateSolidColorVideo produced invalid file for scene $index")
+                Log.e(TAG, "generateSolidColorVideo produced invalid file for scene $index — retrying with minimal guaranteed frame")
+                // إعادة محاولة بإطار مضمون: صورة نقطية بسيطة بلا أي اعتماد خارجي
+                try {
+                    val bmp = android.graphics.Bitmap.createBitmap(1080, 1920, android.graphics.Bitmap.Config.ARGB_8888)
+                    bmp.eraseColor(android.graphics.Color.parseColor(bgTop))
+                    java.io.FileOutputStream(imgFile).use { fos -> bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, fos) }
+                    bmp.recycle()
+                    ok = VideoProcessor.generateVideoFromImage(
+                        context,
+                        imgFile.absolutePath,
+                        safeDuration,
+                        out.absolutePath,
+                        null
+                    )
+                } catch (retryEx: Exception) {
+                    Log.e(TAG, "Minimal frame retry failed for scene $index", retryEx)
+                }
+            }
+            // صدق كامل: لا نجاح وهمي — احذف الملف الفاشل حتى لا يدخل سلسلة الدمج
+            if (!ok || !VideoProcessor.isValidVideoFile(out.absolutePath, minSizeBytes = 5_000L)) {
+                SystemLogsManager.addLog(
+                    "ERROR",
+                    "فشل توليد الإطار المحلي للمشهد $index — لن يدخل الملف الفاشل في الدمج 🔴",
+                    Color(0xFFEF4444)
+                )
+                out.delete()
             }
         } catch (t: Throwable) {
             Log.e(TAG, "Error generating fallback solid video", t)
+            out.delete()
         }
         out
     }

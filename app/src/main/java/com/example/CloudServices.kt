@@ -163,8 +163,8 @@ object CloudServices {
             try {
                 val user = auth.currentUser
                 if (user == null) return
-                val claims = user.customClaims
-                val isAdminFromFirebase = claims.get("admin") as? Boolean ?: false
+                val claims = user.getIdToken(false).await().claims
+                val isAdminFromFirebase = claims["admin"] as? Boolean ?: false
                 // update local prefs
                 val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
                 prefs.edit().putBoolean("is_admin", isAdminFromFirebase).apply()
@@ -174,6 +174,7 @@ object CloudServices {
                 Log.e(TAG, "Failed to sync admin claim: ${e.message}")
             }
         }
+    }
 
     // --- خدمة قاعدة البيانات (Firestore) ---
     object Database {

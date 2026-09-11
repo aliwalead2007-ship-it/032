@@ -12,8 +12,9 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.coroutine.rememberCoroutineScope
-import androidx.lifecycle.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -247,20 +248,18 @@ fun AccountSettingsSection(context: Context) {
         }
 
         // Sync with Firebase custom claim
+        val syncCtx = LocalContext.current
+        val syncScope = rememberCoroutineScope()
         Button(
             onClick = {
-                try {
-                    // We need application context; get it from LocalContext
-                    val ctx = LocalContext.current
-                    // Launch coroutine scope via remember
-                    val scope = rememberCoroutineScope()
-                    scope.launch {
-                        CloudServices.syncAdminClaimFromFirebase(ctx)
+                syncScope.launch {
+                    try {
+                        CloudServices.syncAdminClaimFromFirebase(syncCtx)
                         // Refresh local state after sync
                         isAdmin = prefs.getBoolean("is_admin", false)
+                    } catch (e: Exception) {
+                        Toast.makeText(syncCtx, "فشل المزامنة: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
-                } catch (e: Exception) {
-                    Toast.makeText(ctx, "فشل同步: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             },
             modifier = Modifier.fillMaxWidth().height(44.dp),

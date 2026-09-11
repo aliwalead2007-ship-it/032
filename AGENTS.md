@@ -49,6 +49,9 @@
 | `StyleBrain.kt` | اعتماد وتخزين الأسلوب الأساسي للاستوديو (`primaryStyleId` + `setPrimaryStudioStyle`)، توجيه الإنتاج في `chooseBestStyleForIdea` بالدمج المرجح (70% هوية قبس + 30% أسلوب معتمد)، ودورة التغذية الراجعة التلقائية `recordProductionResult` |
 | `StyleBrainSection.kt` | إضافة بادج وزر اعتماد الأسلوب كـ «أساسي للاستوديو 🌟» في بطاقات الأساليب مع التبديل التلقائي والحفظ الدائم |
 | `RealServices.kt / AndroidManifest.xml / .env.example` | حل أخطاء التجميع وتصاريح أندرويد الناقصة (VIBRATE)، وتنظيف متغيرات البيئة لبناء التطبيق. |
+| `ProcessingScreen.kt` (سبتمبر 2026 — إصلاح تعطل الإنتاج) | رفع مهلة محرك الإنتاج إلى **180–420ث ديناميكياً حسب عدد المشاهد** (كانت 60–180/90–300ث تخنق الترميز السينمائي متعدد المراحل 1080×1920 وتقتل الإنتاج مهما كانت المفاتيح صحيحة). |
+| `VideoEngineManager.kt` (سبتمبر 2026 — إصلاح تعطل الإنتاج) | تصفية المشاهد الصالحة فقط (`isValidVideoFile`) قبل الدمج، **دمج بديل مباشر بلا انتقالات عند فشل الدمج السينمائي** بدل الفشل الكامل، وإطار محلي صادق: إعادة محاولة بإطار نقطي مضمون عند فشل التوليد + حذف الملف الفاشل حتى لا يدخل سلسلة الدمج (لا نجاح وهمي). |
+| `CloudServices.kt / AccountSettingsSection.kt` (سبتمبر 2026 — إصلاح التجميع) | إعادة قوس إغلاق `object Auth` المحذوف (سبب `Missing '}'` وكسر `Database` في كل الملفات)، استبدال `user.customClaims` غير الموجودة بـ `getIdToken(false).await().claims`، تصحيح استيرادين مكسورين في `AccountSettingsSection` وإخراج `LocalContext`/`rememberCoroutineScope` من داخل onClick (استدعاءات @Composable لا تجوز في lambda النقر). |
 
 | `IdeaInputSection.kt` | إصلاح كسر `compileDebugKotlin` (state + أقواس + AlertDialog) |
 | `DeveloperDashboardScreen.kt` | إزالة تضارب `DevLog` مع `object DevLog`، وتصحيح `LogsSection`، وإزالة تعريف `AccountSettingsSection` المزدوج |
@@ -272,6 +275,8 @@
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
+
+**بناء أخضر عبر Actions → تثبيت APK → اختبار تصدير كامل على الجهاز** (بعد إصلاح تعطل الإنتاج ومهلة المحرك والدمج البديل وإصلاح التجميع أعلاه — الإصلاحات تحتاج APK جديداً ليصل الجهاز).
 
 **يعتمد على ما يبلّغ به المستخدم بعد التجربة:**
 

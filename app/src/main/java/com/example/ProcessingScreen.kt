@@ -331,10 +331,12 @@ fun ProcessingScreen(
                 contentType.contains("Shorts", ignoreCase = true) ||
                 contentType.contains("ريلز", ignoreCase = true)
 
+            // مهلة ديناميكية كريمة 180–420ث حسب عدد المشاهد — الترميز السينمائي 1080×1920
+            // مع 4 مراحل FFmpeg لكل مشهد (قص/صوت/نص/تلوين) يحتاج زمناً حقيقياً لا افتراضياً
             val engineTimeoutMs = if (isShortForm) {
-                (processedScenes.size * 25_000L + 40_000L).coerceIn(60_000L, 180_000L)
+                (processedScenes.size * 45_000L + 90_000L).coerceIn(180_000L, 420_000L)
             } else {
-                (processedScenes.size * 35_000L + 60_000L).coerceIn(90_000L, 300_000L)
+                (processedScenes.size * 60_000L + 120_000L).coerceIn(180_000L, 420_000L)
             }
 
             var finalProducedFile: java.io.File? = null
