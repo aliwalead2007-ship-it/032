@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -251,21 +250,34 @@ fun YouTubeStudioScreen(
         ) {
             // Header Stats
             item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    StatBox(
-                        title = Translator.tr("المشاهدات (الشهرية)"),
-                        value = "124K",
-                        subtitle = "+12% " + Translator.tr("عن الشهر الماضي"),
-                        icon = Icons.Default.Visibility,
-                        modifier = Modifier.weight(1f)
-                    )
-                    StatBox(
-                        title = Translator.tr("المشتركين الجدد"),
-                        value = "850",
-                        subtitle = "+5% " + Translator.tr("عن الشهر الماضي"),
-                        icon = Icons.Default.GroupAdd,
-                        modifier = Modifier.weight(1f)
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF141414))
+                        .border(1.dp, Color(0xFF222222), RoundedCornerShape(16.dp))
+                        .padding(20.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Visibility, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(28.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            Translator.tr("لا تتوفر إحصائيات حقيقية بعد"),
+                            color = Color.White,
+                            fontFamily = CairoFont,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            Translator.tr("لم تُربط الشاشة بحساب يوتيوب فعلياً — تُعرض الأرقام الحقيقية عند الربط."),
+                            color = Color.Gray,
+                            fontFamily = NotoSansFont,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
 
@@ -327,16 +339,38 @@ fun YouTubeStudioScreen(
                 }
             }
 
-            // Recent Projects
             item {
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(Translator.tr("المشاريع الطويلة الأخيرة"), color = Color.White, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(
+                        Translator.tr("المشاريع الطويلة الأخيرة"),
+                        color = Color.White,
+                        fontFamily = TajawalFont,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
                 }
             }
 
-            items(3) { index ->
-                RecentLongProjectItem(index)
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xFF141414))
+                        .border(1.dp, Color(0xFF222222), RoundedCornerShape(16.dp))
+                        .padding(20.dp)
+                ) {
+                    Text(
+                        Translator.tr("لا توجد مشاريع محفوظة بعد — أنشئ أول مشروع من أدوات الاستوديو أعلاه."),
+                        color = Color.Gray,
+                        fontFamily = NotoSansFont,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             item {
@@ -354,28 +388,6 @@ fun YouTubeStudioScreen(
                 }
                 Spacer(modifier = Modifier.height(32.dp))
             }
-        }
-    }
-}
-
-@Composable
-fun StatBox(title: String, value: String, subtitle: String, icon: ImageVector, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF141414))
-            .border(1.dp, Color(0xFF222222), RoundedCornerShape(16.dp))
-            .padding(16.dp)
-    ) {
-        Column {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(title, color = Color.Gray, fontFamily = NotoSansFont, fontSize = 14.sp)
-                Icon(icon, contentDescription = null, tint = GoldPrimary.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(value, color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(subtitle, color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 12.sp)
         }
     }
 }
@@ -408,46 +420,6 @@ fun ToolCard(tool: ToolItem, onClick: () -> Unit = {}) {
         Text(tool.title, color = Color.White, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 14.sp, textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(4.dp))
         Text(tool.desc, color = Color.Gray, fontFamily = NotoSansFont, fontSize = 12.sp, textAlign = TextAlign.Center, lineHeight = 16.sp)
-    }
-}
-
-@Composable
-fun RecentLongProjectItem(index: Int) {
-    val titles = listOf(Translator.tr("شرح السيرة النبوية - الحلقة 5"), Translator.tr("خطبة الجمعة: فضل الصدقة"), Translator.tr("دورة التجويد الميسر - الدرس الأول"))
-    val durations = listOf("45:20", "28:15", "1:15:00")
-    
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFF141414))
-            .clickable { }
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFF2A2A2A)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.LightGray)
-        }
-        
-        Spacer(modifier = Modifier.width(16.dp))
-        
-        Column(modifier = Modifier.weight(1f)) {
-            Text(titles[index], color = Color.White, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.AccessTime, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(durations[index], color = Color.Gray, fontFamily = NotoSansFont, fontSize = 12.sp)
-            }
-        }
-        
-        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.Gray, modifier = Modifier.size(20.dp))
     }
 }
 
