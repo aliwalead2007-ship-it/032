@@ -820,14 +820,18 @@ fun ContentGuardScreen(
 
                                     Spacer(modifier = Modifier.height(20.dp))
 
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        StatBox(title = "مقاطع المدافعة", value = "12 مقطعاً")
-                                        StatBox(title = "الوصول التقديري", value = "45.2K")
-                                        StatBox(title = "نقاط الرباط", value = "380 XP")
-                                    }
+Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Text(
+                Translator.tr("لا توجد بيانات عرضة للعرض بعد"),
+                color = Color.Gray,
+                fontFamily = NotoSansFont,
+                fontSize = 14.sp,
+                textAlign = TextAlign.Center
+            )
+        }
                                 }
                             }
                         }
