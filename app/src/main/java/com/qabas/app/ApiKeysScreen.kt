@@ -41,6 +41,47 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private val DEFAULT_BROWSER_FALLBACKS = listOf(
+    "com.android.chrome",
+    "com.chrome.beta",
+    "org.mozilla.firefox",
+    "org.mozilla.firefox.beta",
+    "com.opera.browser",
+    "com.opera.mini.native",
+    "com.sec.android.app.sbrowser",
+    "com.microsoft.emmx",
+    "com.brave.browser",
+    "com.duckduckgo.mobile.android",
+    "com.transsion.phoenix",
+    "com.android.browser"
+)
+
+private fun openUrl(context: Context, url: String) {
+    val uri = Uri.parse(url)
+    val pm = context.packageManager
+    try {
+        val implicit = Intent(Intent.ACTION_VIEW, uri)
+        if (implicit.resolveActivity(pm) != null) {
+            context.startActivity(implicit)
+            return
+        }
+    } catch (_: Exception) {
+        // ننتقل للمتصفحات الصريحة
+    }
+    for (pkg in DEFAULT_BROWSER_FALLBACKS) {
+        try {
+            val explicit = Intent(Intent.ACTION_VIEW, uri).setPackage(pkg)
+            if (explicit.resolveActivity(pm) != null) {
+                context.startActivity(explicit)
+                return
+            }
+        } catch (_: Exception) {
+            // جرّب المتصفح التالي
+        }
+    }
+    Toast.makeText(context, "لا يوجد متصفح مثبت على الجهاز — افتح الرابط يدوياً: $url", Toast.LENGTH_LONG).show()
+}
+
 private val KEY_PATTERNS: Map<String, Regex> = mapOf(
     "gemini" to Regex("""AIzaSy[A-Za-z0-9_\-]{33}"""),
     "groq" to Regex("""(?:gsk_[A-Za-z0-9_\-]{10,}|xai-[A-Za-z0-9_\-]{10,})"""),
@@ -1083,13 +1124,7 @@ fun LiveHealthCheckPanel() {
                     ) {
                         Text("• ${svc.name}: ", color = TextPrimary, fontFamily = CairoFont, fontSize = 11.5.sp)
                         Text(if (svc.result!!.suggestedFix.isNotBlank()) svc.result!!.suggestedFix else svc.result!!.explanation, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        TextButton(onClick = {
-                            try {
-                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(svc.url)))
-                            } catch (e: Exception) {
-                                Toast.makeText(context, Translator.tr("تعذر فتح الرابط"), Toast.LENGTH_SHORT).show()
-                            }
-                        }) {
+                        TextButton(onClick = { openUrl(context, svc.url) }) {
                             Text("الموقع 🔗", color = GoldPrimary, fontFamily = CairoFont, fontSize = 11.sp)
                         }
                     }
@@ -1249,12 +1284,7 @@ fun ApiKeyCard(
                         Button(
                             onClick = {
                                 showInstructions = false
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, Translator.tr("تعذر فتح الرابط"), Toast.LENGTH_SHORT).show()
-                                }
+                                openUrl(context, url)
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)
                         ) {
@@ -1368,14 +1398,7 @@ fun ApiKeyCard(
                         Text("التقاط من الحافظة 📋", color = GoldPrimary, fontFamily = CairoFont, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                     OutlinedButton(
-                        onClick = {
-                            try {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                context.startActivity(intent)
-                            } catch (e: Exception) {
-                                Toast.makeText(context, Translator.tr("تعذر فتح الرابط"), Toast.LENGTH_SHORT).show()
-                            }
-                        },
+                        onClick = { openUrl(context, url) },
                         modifier = Modifier.height(38.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF334155)),
                         shape = RoundedCornerShape(8.dp)

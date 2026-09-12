@@ -302,6 +302,15 @@
 | الإصدار | `versionCode = 3`، `versionName = "1.2.1"` — APK جديد يثبت فوق 1.2.0. |
 | الملفات | `gradle/libs.versions.toml`، `app/build.gradle.kts`، `AGENTS.md`، `README.md`. |
 
+### ص) إصلاح زر «فتح الموقع» في شاشة المفاتيح (سبتمبر 2026)
+
+| عنصر | ماذا أُنجز |
+|-----|------------|
+| المشكلة | أزرار فتح الروابط («افتح الموقع»، «الموقع 🔗»، «فتح الموقع» في حوار التعليمات) كانت تعرض «تعذر فتح الرابط» على أجهزة بعض المستخدمين — `startActivity(ACTION_VIEW)` يفشل عند عدم توفّر متصفح افتراضي مرئي أو عند قيود رؤية الحزم. |
+| الحل | دالة `openUrl(context, url)` موحّدة: تحاول `ACTION_VIEW` الافتراضي، ثم تفحص قائمة متصفحات شهيرة صريحة (`chrome`/`firefox`/`opera`/`edge`/`brave`/`duckduckgo`/`transsion`/AOSP) واحداً واحداً، وإن لم يوجد متصفح تعرض الرابط كاملاً في رسالة واضحة بدل رسالة مبهمة. |
+| Manifest | إضافة `<queries>` لـ `ACTION_VIEW` مع `https` و`http` (إعلان صريح لرؤية المتصفحات). |
+| الملفات | `AndroidManifest.xml`، `app/src/main/java/com/qabas/app/ApiKeysScreen.kt`، `AGENTS.md`، `README.md`. |
+
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
@@ -390,6 +399,7 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 > لوحة المطور: 14 نقطة HTTP ملفوفة بـ `ApiUsageTracker` (انضمّت Azure TTS وElevenLabs من شاشة المفاتيح)، وتحميل فعلي من Firestore/Supabase/Room.  
 > **سبتمبر 2026:** Gemini ↑ 2.0-flash، دمج FFmpeg حقيقي، تعليق صوتي مجاني دائماً (TTS النظام)، توثيق مجانيّ في `.env.example`، CI أخضر.
 > **سبتمبر 2026 (إصلاح FlowRow):** تثبيت `foundation`/`foundation-layout` 1.9.0 صريحاً لإزالة `NoSuchMethodError` على `FlowRow` في شاشات الملف الشخصي والتجويد والفهم والهاشتاقات. `versionCode = 3`، `versionName = 1.2.1`.  
+> **سبتمبر 2026 (زر «فتح الموقع»):** `openUrl` موحّدة ببدائل متصفحات صريحة + `<queries>` في Manifest — لا «تعذر فتح الرابط» مبهم بعد الآن.
 > شاشة المفاتيح اكتملت لكل الطبقة المجانية (Azure + ElevenLabs وبطاقة «يعمل بلا مفاتيح»).  
 > **UI سبتمبر 2026:** انتقال أنيميشن بين الشاشات (`AnimatedContent` slide+fade)، مكوّنا `QabasCard`/`QabasSectionHeader` مع اعتمادها في المشاريع، وتغطية تحقق المفاتيح بالعداد — CI أخضر للدفعة (`7542c0e`).  
 > **طبقة سحابية (سبتمبر 2026):** ربط Supabase الفعلي — `.env` بقيم حقيقية محلياً، تحقق قراءة/كتابة/حذف حي، `isConfigured` محصّن ضد placeholder، وCI جاهز لحقن السرّين (يعمل محلياً حتى بدونهما).  
