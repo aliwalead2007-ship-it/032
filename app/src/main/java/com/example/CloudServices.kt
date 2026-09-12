@@ -244,6 +244,56 @@ object CloudServices {
             }
         }
 
+        /**
+         * تحديث رتبة مستخدم فعلياً في Firestore من لوحة المطور.
+         * حماية صارمة: رتبة المالك (OWNER_EMAIL) لا تُخفض أبداً من هذه الشاشة — فقط رفعها مسموح.
+         * يُرجع true عند النجاح الحقيقي فقط — لا نجاح وهمي أبداً.
+         */
+        suspend fun updateUserRole(userId: String, userEmail: String, newType: String): Boolean {
+            if (!isFirebaseInitialized) {
+                Log.w(TAG, "Firebase is not initialized. Cannot update user role.")
+                return false
+            }
+            if (isOwnerAccount(userEmail) && newType != "مطور") {
+                Log.w(TAG, "Blocked attempt to downgrade owner account role.")
+                return false
+            }
+            return try {
+                db.collection("users").document(userId)
+                    .update("type", newType).await()
+                Log.d(TAG, "User ($userId) role updated to $newType successfully.")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating user role: ${e.message}", e)
+                false
+            }
+        }
+
+        /**
+         * تحديث حالة إيقاف مستخدم فعلياً في Firestore من لوحة المطور.
+         * حماية صارمة: حساب المالك لا يمكن إيقافه من هذه الشاشة.
+         * يُرجع true عند النجاح الحقيقي فقط.
+         */
+        suspend fun updateUserSuspension(userId: String, userEmail: String, isSuspended: Boolean): Boolean {
+            if (!isFirebaseInitialized) {
+                Log.w(TAG, "Firebase is not initialized. Cannot update suspension status.")
+                return false
+            }
+            if (isOwnerAccount(userEmail) && isSuspended) {
+                Log.w(TAG, "Blocked attempt to suspend owner account.")
+                return false
+            }
+            return try {
+                db.collection("users").document(userId)
+                    .update("isSuspended", isSuspended).await()
+                Log.d(TAG, "User ($userId) suspension set to $isSuspended successfully.")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating suspension status: ${e.message}", e)
+                false
+            }
+        }
+
         suspend fun savePromoCodeToCloud(code: String, type: String, value: Long): Boolean {
             if (!isFirebaseInitialized) {
                 Log.w(TAG, "Firebase is not initialized. Cannot save promo code to cloud.")

@@ -1088,18 +1088,36 @@ fun UsersSection(context: Context, devUsers: androidx.compose.runtime.snapshots.
             DevUserItemRow(
                 user = user,
                 onTypeChange = { newType ->
-                    val index = devUsers.indexOf(user)
-                    if (index != -1) {
-                        devUsers[index] = devUsers[index].copy(type = newType)
-                        Toast.makeText(context, "تم تغيير الرتبة إلى $newType", Toast.LENGTH_SHORT).show()
+                    coroutineScope.launch {
+                        val success = CloudServices.Database.updateUserRole(user.id, user.email, newType)
+                        if (success) {
+                            val index = devUsers.indexOf(user)
+                            if (index != -1) devUsers[index] = devUsers[index].copy(type = newType)
+                            Toast.makeText(context, "تم تغيير الرتبة إلى $newType وحُفظ في السحابة", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val reason = if (CloudServices.isOwnerAccount(user.email))
+                                "لا يمكن تخفيض رتبة حساب المالك"
+                            else
+                                "تعذر الحفظ في السحابة — تحقق من الاتصال بالإنترنت"
+                            Toast.makeText(context, "فشل تغيير الرتبة: $reason", Toast.LENGTH_LONG).show()
+                        }
                     }
                 },
                 onSuspendToggle = {
-                    val index = devUsers.indexOf(user)
-                    if (index != -1) {
-                        val newStatus = !user.isSuspended
-                        devUsers[index] = devUsers[index].copy(isSuspended = newStatus)
-                        Toast.makeText(context, if (newStatus) "تم إيقاف الحساب" else "تم إلغاء إيقاف الحساب", Toast.LENGTH_SHORT).show()
+                    val newStatus = !user.isSuspended
+                    coroutineScope.launch {
+                        val success = CloudServices.Database.updateUserSuspension(user.id, user.email, newStatus)
+                        if (success) {
+                            val index = devUsers.indexOf(user)
+                            if (index != -1) devUsers[index] = devUsers[index].copy(isSuspended = newStatus)
+                            Toast.makeText(context, if (newStatus) "تم إيقاف الحساب وحُفظ في السحابة" else "تم إلغاء الإيقاف وحُفظ في السحابة", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val reason = if (CloudServices.isOwnerAccount(user.email))
+                                "لا يمكن إيقاف حساب المالك"
+                            else
+                                "تعذر الحفظ في السحابة — تحقق من الاتصال بالإنترنت"
+                            Toast.makeText(context, "فشل تحديث الحالة: $reason", Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
             )
