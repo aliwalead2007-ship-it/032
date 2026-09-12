@@ -193,7 +193,8 @@ fun RegisterScreen(
 
                         if (success) {
                             val lowerEmail = trimmedEmail.lowercase(java.util.Locale.ROOT)
-                            val isAdmin = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE).getBoolean("is_admin", false)
+                            // رتبة المطور تُمنح تلقائياً لبريد المالك فقط، وإلا من العلم المحلي الحقيقي
+                            val isAdmin = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE).getBoolean("is_admin", false) || CloudServices.isOwnerAccount(lowerEmail)
                             
                             if (CloudServices.isFirebaseInitialized) {
                                 val userId = CloudServices.Auth.getCurrentUserId() ?: java.util.UUID.randomUUID().toString()

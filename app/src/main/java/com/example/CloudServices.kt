@@ -1,5 +1,7 @@
 package com.example
 
+import java.util.Locale
+
 import android.content.Context
 import android.util.Log
 import com.google.firebase.FirebaseApp
@@ -21,6 +23,12 @@ import com.example.ProjectService.Project
  * تم تجهيز هذا الملف ليعمل فور إضافة ملف google-services.json
  */
 object CloudServices {
+    /** بريد مالك التطبيق — الاستثناء الوحيد لمنح رتبة «مطور» تلقائياً (بطلب من المالك نفسه) */
+    const val OWNER_EMAIL = "aliwalead.2007@gmail.com"
+
+    /** هل هذا حساب المالك؟ (مقارنة غير حساسة لحالة الأحرف وبالمسافات) */
+    fun isOwnerAccount(email: String?): Boolean =
+        email?.trim()?.lowercase(java.util.Locale.ROOT) == OWNER_EMAIL
     private const val TAG = "CloudServices"
     
     // حالة توفر الفايربيز لتجنب انهيار التطبيق قبل إضافة الملف
@@ -166,9 +174,10 @@ object CloudServices {
                 if (user == null) return
                 val claims = user.getIdToken(false).await().claims
                 val isAdminFromFirebase = claims["admin"] as? Boolean ?: false
-                // update local prefs
+                // رتبة المالك لا تُخفض أبداً — الحفاظ على is_admin عند حساب المالك ولو كان الـ claim السحابي فارغاً
+                val newAdminState = isAdminFromFirebase || isOwnerAccount(user.email)
                 val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
-                prefs.edit().putBoolean("is_admin", isAdminFromFirebase).apply()
+                prefs.edit().putBoolean("is_admin", newAdminState).apply()
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to sync admin claim: ${e.message}")
             }

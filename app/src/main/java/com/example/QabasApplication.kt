@@ -15,6 +15,17 @@ class QabasApplication : Application() {
 
         QabasCrashGuard.install(this)
 
+        // رتبة «مطور» تلقائية لبريد المالك فقط — ولو كان مسجل الدخول مسبقاً (بطلب من المالك)
+        try {
+            val prefs = getSharedPreferences("qabas_prefs", MODE_PRIVATE)
+            val email = prefs.getString("user_email", null)
+            if (prefs.getBoolean("is_logged_in", false) && CloudServices.isOwnerAccount(email)) {
+                prefs.edit().putBoolean("is_admin", true).apply()
+                Log.d("QabasApplication", "Owner account detected — developer rank granted")
+            }
+        } catch (_: Exception) {
+        }
+
         // Initialize Firebase & Analytics with respect to user settings
         try {
             if (FirebaseApp.getApps(this).isEmpty()) {

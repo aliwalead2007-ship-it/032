@@ -219,7 +219,8 @@ fun LoginScreen(
                             coroutineScope.launch {
                                 val lowerEmail = trimmedEmail.lowercase(java.util.Locale.ROOT)
                                 val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
-                                val isAdmin = prefs.getBoolean("is_admin", false) // Admin/relative from real flags only — no email grants
+                                // Admin/relative from real flags only — الاستثناء الوحيد: بريد المالك نفسه
+                                val isAdmin = prefs.getBoolean("is_admin", false) || CloudServices.isOwnerAccount(lowerEmail)
                                 val isRelative = prefs.getBoolean("is_relative", false)
 
                                 var success = false
