@@ -215,10 +215,17 @@ class VideoEngineManager(private val context: Context) {
                         videoReadyPath = solid.absolutePath
                     }
 
-                    // TTS — في المسار المضمون نتخطى الشبكة ونستخدم صوتاً محلياً إن وُجد، وإلا نكمل بدون صوت
+                    // TTS — في المسار المضمون نستخدم محرك النطق المحلي لأندرويد فقط (بلا شبكة ولا مفاتيح)،
+                    // وإلا نكمل بدون صوت. لا يعود الفيديو من المسار المضمون أبكم إن توفر TTS النظام.
                     val spokenArabicText = if (scene.title.isNotBlank()) scene.title else scene.description
                     val audioPath = if (preferGuaranteedPath) {
-                        null // لا ننتظر TTS خارجي في المسار المضمون
+                        try {
+                            AndroidTTSService.synthesizeSpeech(spokenArabicText)
+                        } catch (localTtsEx: Exception) {
+                            if (localTtsEx is CancellationException) throw localTtsEx
+                            Log.w(TAG, "Local system TTS unavailable in guaranteed path for scene $index")
+                            null
+                        }
                     } else {
                         try {
                             AppServices.generateVoiceover(spokenArabicText)
