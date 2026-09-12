@@ -1,5 +1,3 @@
-import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
-
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.compose)
@@ -11,7 +9,8 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  // تم تعديل الـ namespace ليتطابق مع الـ applicationId لسلامة ملفات الـ R
+  namespace = "com.qabas.app"
   compileSdk = 36
 
   defaultConfig {
@@ -34,12 +33,7 @@ android {
         keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
         keyPassword = System.getenv("KEY_PASSWORD")
       }
-      // else: leave unsigned / use default — CI debug builds do not need release keystore
     }
-    // Prefer project debug.keystore if present; otherwise fall back to the standard Android debug keystore
-    // الأسبقية الآن: مفتاح CI الثابت (env) ← مفتاح المستودع الثابت (signing/qabas-ci.p12) ← debug.keystore المشروع ← مفتاح الـ SDK
-    // (قبل هذا التعديل كان مفتاح الـ runner يُولَّد من جديد كل بناء → توقيع مختلف → أندرويد يطلب حذف النسخة القديمة عند التحديث)
-    // مفتاح المستودع ببيانات اعتماد debug القياسية المعروفة علناً (android/androiddebugkey) — هوية تحديث ثابتة فقط وليس مفتاح نشر حساساً
     create("debugConfig") {
       val ciKeystore = System.getenv("KEYSTORE_PATH")?.let { file(it) }
       val repoKeystore = file("${rootDir}/signing/qabas-ci.p12")
@@ -55,8 +49,8 @@ android {
         ciKeystore != null && ciKeystore.exists() -> {
           storeFile = ciKeystore
           storePassword = System.getenv("STORE_PASSWORD") ?: "android"
-          keyAlias = System.getenv("KEY_ALIAS") ?: "qabas"
-          keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+          keyAlias = "androiddebugkey"
+          keyPassword = "android"
         }
         projectDebug.exists() -> {
           storeFile = projectDebug
@@ -70,9 +64,6 @@ android {
           keyAlias = "androiddebugkey"
           keyPassword = "android"
         }
-        else -> {
-          // Let AGP generate / use its default debug signing (no explicit storeFile)
-        }
       }
     }
   }
@@ -82,7 +73,6 @@ android {
       isCrunchPngs = false
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      // Only apply release signing when a keystore was actually configured
       val releaseCfg = signingConfigs.getByName("release")
       if (releaseCfg.storeFile != null && releaseCfg.storeFile!!.exists()) {
         signingConfig = releaseCfg
@@ -93,7 +83,6 @@ android {
       if (debugCfg.storeFile != null && debugCfg.storeFile!!.exists()) {
         signingConfig = debugCfg
       }
-      // otherwise AGP default debug signing is used automatically
     }
   }
   compileOptions {
@@ -110,7 +99,6 @@ android {
     includeInBundle = true
   }
 
-  // OpenCV + FFmpeg-Kit both ship libc++_shared.so → pick first to avoid MergeNativeLibs failure
   packaging {
     jniLibs {
       pickFirsts += listOf(
@@ -129,7 +117,7 @@ secrets {
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
 }
 
-googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }
+// تم حذف سطر الـ missingGoogleServicesStrategy لفرض وجود الملف وتجنب فشل التشغيل الصامت
 
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
@@ -172,7 +160,6 @@ dependencies {
   implementation(libs.billing.ktx)
   implementation(libs.opencv)
 
-  // Supabase (backend as a service) — Postgres database, Auth, Storage, Edge Functions
   implementation(platform(libs.supabase.bom))
   implementation(libs.supabase.postgrest)
   implementation(libs.supabase.auth)
