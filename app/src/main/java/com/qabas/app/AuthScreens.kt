@@ -210,7 +210,7 @@ fun RegisterScreen(
                             prefs.edit().apply {
                                 putBoolean("is_logged_in", true)
                                 putBoolean("is_admin", isAdmin)
-                                putBoolean("is_developer", prefs.getBoolean("is_developer", true))
+                                putBoolean("is_developer", CloudServices.isOwnerAccount(lowerEmail))
                                 putBoolean("is_premium", true)
                                 putString("user_email", trimmedEmail)
                                 putString("user_name", name.trim())

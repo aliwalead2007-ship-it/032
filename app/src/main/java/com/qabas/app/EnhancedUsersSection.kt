@@ -42,6 +42,7 @@ fun EnhancedUsersSection(context: Context, devUsers: androidx.compose.runtime.sn
     var confirmRoleUser by remember { mutableStateOf<DevUser?>(null) }
     var confirmSuspendUser by remember { mutableStateOf<DevUser?>(null) }
     var confirmNewRole by remember { mutableStateOf<String?>(null) }
+    var roleMenuUser by remember { mutableStateOf<DevUser?>(null) }
     var showAddUserDialog by remember { mutableStateOf(false) }
     var newUserName by remember { mutableStateOf("") }
     var newUserEmail by remember { mutableStateOf("") }
@@ -239,13 +240,14 @@ fun EnhancedUsersSection(context: Context, devUsers: androidx.compose.runtime.sn
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
-                    selected = typeFilter != "الكل",
-                    onClick = { if (typeFilter == "الكل") typeFilter = "مطور" else typeFilter = "الكل" },
-                    label = { Text("الرتبة: $typeFilter", color = GoldSecondary, fontFamily = CairoFont, fontSize = 11.sp) }
-                )
-                FilterChip(
                     selected = statusFilter != "الكل",
-                    onClick = { if (statusFilter == "الكل") statusFilter = "نشط" else statusFilter = "الكل" },
+                    onClick = {
+                        statusFilter = when (statusFilter) {
+                            "الكل" -> "نشط"
+                            "نشط" -> "موقوف"
+                            else -> "الكل"
+                        }
+                    },
                     label = { Text("الحالة: $statusFilter", color = if (statusFilter == "موقوف") Color(0xFFEF4444) else GoldSecondary, fontFamily = CairoFont, fontSize = 11.sp) }
                 )
                 Spacer(modifier = Modifier.weight(1f))
@@ -323,15 +325,26 @@ fun EnhancedUsersSection(context: Context, devUsers: androidx.compose.runtime.sn
                             border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f)),
                             contentPadding = PaddingValues(horizontal = 8.dp)
                         ) { Text("تفاصيل", color = GoldPrimary, fontFamily = CairoFont, fontSize = 11.sp) }
-                        OutlinedButton(
-                            onClick = {
-                                confirmNewRole = if (user.type == "مطور") "خاص" else "مطور"
-                                confirmRoleUser = user
-                            },
-                            modifier = Modifier.weight(1f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f)),
-                            contentPadding = PaddingValues(horizontal = 8.dp)
-                        ) { Text("تبديل الرتبة", color = GoldSecondary, fontFamily = CairoFont, fontSize = 11.sp) }
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedButton(
+                                onClick = { roleMenuUser = user },
+                                modifier = Modifier.fillMaxWidth(),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f)),
+                                contentPadding = PaddingValues(horizontal = 8.dp)
+                            ) { Text("تغيير الرتبة", color = GoldSecondary, fontFamily = CairoFont, fontSize = 11.sp) }
+                            DropdownMenu(expanded = roleMenuUser == user, onDismissRequest = { roleMenuUser = null }, containerColor = DeepSlate) {
+                                listOf("مطور", "خاص", "Freemium").forEach { role ->
+                                    DropdownMenuItem(
+                                        text = { Text(role, color = if (role == user.type) GoldPrimary else Color.White, fontFamily = CairoFont, fontSize = 12.sp) },
+                                        onClick = {
+                                            roleMenuUser = null
+                                            confirmNewRole = role
+                                            confirmRoleUser = user
+                                        }
+                                    )
+                                }
+                            }
+                        }
                         OutlinedButton(
                             onClick = { confirmSuspendUser = user },
                             modifier = Modifier.weight(1f),

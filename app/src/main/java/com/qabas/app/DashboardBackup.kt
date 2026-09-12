@@ -57,6 +57,7 @@ fun DashboardBackupSection() {
             }
             isExporting = false
             Toast.makeText(context, "تم التصدير بنجاح ✅", Toast.LENGTH_SHORT).show()
+            AuditLogger.log(context, "backup_export", "تصدير نسخة احتياطية كاملة JSON")
         }
     }
 
