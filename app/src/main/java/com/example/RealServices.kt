@@ -21,6 +21,54 @@ import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
+/**
+ * موحّد مفاتيح الخدمات: أسبقية المفتاح المُدخل من شاشة "مفاتيح API" (qabas_prefs)
+ * ثم المفتاح المحقون وقت البناء من .env / GitHub Secrets عبر BuildConfig.
+ * القيم الوهمية (your_key / YOUR_...) تُعامل كمفقودة — لا تشغيل وهمي أبداً.
+ */
+object KeyVault {
+    private const val PREFS = "qabas_prefs"
+
+    private fun prefs() =
+        AppServices.appContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
+
+    private fun isReal(value: String?): Boolean {
+        val t = value?.trim() ?: return false
+        return t.isNotEmpty() && !t.lowercase().startsWith("your_")
+    }
+
+    private fun resolve(prefsKey: String, fromBuildConfig: String?): String {
+        val fromPrefs = prefs().getString(prefsKey, "") ?: ""
+        if (isReal(fromPrefs)) return fromPrefs.trim()
+        if (isReal(fromBuildConfig)) return fromBuildConfig!!.trim()
+        return ""
+    }
+
+    val gemini: String get() = resolve("gemini_key", BuildConfig.GEMINI_API_KEY)
+    val groq: String get() = resolve("groq_key", BuildConfig.GROQ_API_KEY)
+    val openai: String get() = resolve("openai_key", BuildConfig.OPENAI_API_KEY)
+    val huggingface: String get() = resolve("huggingface_key", BuildConfig.HUGGINGFACE_API_KEY)
+    val azureSpeechKey: String get() = resolve("azure_speech_key", BuildConfig.AZURE_SPEECH_KEY)
+    val azureSpeechRegion: String get() = resolve("azure_speech_region", BuildConfig.AZURE_SPEECH_REGION)
+    val elevenlabs: String get() = resolve("elevenlabs_key", BuildConfig.ELEVENLABS_API_KEY)
+    val pexels: String get() = resolve("pexels_key", BuildConfig.PEXELS_API_KEY)
+    val pixabay: String get() = resolve("pixabay_key", BuildConfig.PIXABAY_API_KEY)
+
+    /** المفتاح الفعّال لأي اسم مفتاح معروف — يستخدمه الطبيب ولوحة الجاهزية لتقرير الحقيقة كاملة */
+    fun effective(prefsKey: String): String = when (prefsKey) {
+        "gemini_key" -> gemini
+        "groq_key" -> groq
+        "openai_key" -> openai
+        "huggingface_key" -> huggingface
+        "azure_speech_key" -> azureSpeechKey
+        "azure_speech_region" -> azureSpeechRegion
+        "elevenlabs_key" -> elevenlabs
+        "pexels_key" -> pexels
+        "pixabay_key" -> pixabay
+        else -> (prefs().getString(prefsKey, "") ?: "").trim()
+    }
+}
+
 object RealGeminiService {
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -30,7 +78,7 @@ object RealGeminiService {
     
     suspend fun analyzeIdea(idea: String): IdeaAnalysis = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("gemini_key", "") ?: ""
+        val apiKey = KeyVault.gemini
         val fallbackResult = buildDefaultIdeaAnalysis(idea)
         
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
@@ -149,9 +197,9 @@ object RealGeminiService {
 
     suspend fun transcribeAudio(audioFile: File): String = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        var apiKey = prefs.getString("gemini_key", "") ?: ""
-        if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
-            apiKey = BuildConfig.GROQ_API_KEY
+        var apiKey = KeyVault.gemini
+        if (apiKey.isBlank()) {
+            apiKey = KeyVault.groq
         }
         if (apiKey.isBlank() || !audioFile.exists() || audioFile.length() == 0L) {
             return@withContext ""
@@ -211,7 +259,7 @@ object RealGeminiService {
 
     suspend fun analyzeVideoStyle(url: String): VideoStyleAnalysis = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("gemini_key", "") ?: ""
+        val apiKey = KeyVault.gemini
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
             return@withContext VideoStyleAnalysis(detectedStyle = "تأكد من إعداد مفتاح API.")
         }
@@ -321,7 +369,7 @@ object RealGeminiService {
             )
         }
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("gemini_key", "") ?: ""
+        val apiKey = KeyVault.gemini
             
         val fallbackScenes = buildDefaultFallbackScenes(idea)
         
@@ -593,7 +641,7 @@ object RealGeminiService {
 
     suspend fun generateDeveloperPrompts(request: AppRequestService.AppRequest): String = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("gemini_key", "") ?: ""
+        val apiKey = KeyVault.gemini
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
             return@withContext "حدث خطأ أثناء إنشاء الأوامر." 
         }
@@ -682,10 +730,8 @@ object RealMediaLibraryService {
                 }
             }
         ) {
-            val pixabayKey = prefs.getString("pixabay_key", "")?.trim().takeIf { !it.isNullOrBlank() } 
-                ?: BuildConfig.PIXABAY_API_KEY.takeIf { it.isNotBlank() && it != "your_key" }.orEmpty()
-            val pexelsKey = prefs.getString("pexels_key", "")?.trim().takeIf { !it.isNullOrBlank() }
-                ?: BuildConfig.PEXELS_API_KEY.takeIf { it.isNotBlank() && it != "your_key" }.orEmpty()
+            val pixabayKey = KeyVault.pixabay
+            val pexelsKey = KeyVault.pexels
 
             if (type == "audio") {
                 val audioQuery = ContentFilterService.filterAudioQuery(cleanQuery)
@@ -796,7 +842,7 @@ object RealMediaLibraryService {
         customSystemInstruction: String? = null
     ): String = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("gemini_key", "") ?: ""
+        val apiKey = KeyVault.gemini
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
             return@withContext "عذراً، مفتاح Gemini غير متوفر. يرجى إضافته من الإعدادات."
         }
@@ -859,7 +905,7 @@ object RealGroqService {
 
     suspend fun chatOrGenerate(prompt: String): String? = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("groq_key", "")?.trim().orEmpty()
+        val apiKey = KeyVault.groq
         if (apiKey.isBlank()) return@withContext null
 
         try {
@@ -909,10 +955,7 @@ object RealOpenAIService {
 
     suspend fun chatOrGenerate(prompt: String): String? = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        var apiKey = prefs.getString("openai_key", "")?.trim().orEmpty()
-        if (apiKey.isBlank()) {
-            apiKey = BuildConfig.OPENAI_API_KEY.takeIf { it.isNotBlank() && it != "your_key" }.orEmpty()
-        }
+        var apiKey = KeyVault.openai
         if (apiKey.isBlank()) return@withContext null
 
         try {
@@ -958,7 +1001,7 @@ object RealHuggingFaceService {
 
     suspend fun generateImage(prompt: String): String? = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("huggingface_key", "") ?: ""
+        val apiKey = KeyVault.huggingface
         if (apiKey.isBlank()) return@withContext null
 
         try {
@@ -1001,9 +1044,8 @@ object RealAzureSpeechService {
         pitch: String = "+0%"
     ): String? = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("azure_speech_key", "")?.trim().orEmpty()
-        var region = prefs.getString("azure_speech_region", "")?.trim().orEmpty()
-        if (region.isBlank()) region = "eastus"
+        val apiKey = KeyVault.azureSpeechKey
+        var region = KeyVault.azureSpeechRegion.ifBlank { "eastus" }
 
         if (apiKey.isBlank()) {
             SystemLogsManager.addLog("WARN", "مفتاح Azure Speech غير مضبوط في الإعدادات.", Color(0xFFE8C547))
@@ -1076,7 +1118,7 @@ object RealElevenLabsService {
         similarityBoost: Double = 0.75
     ): String? = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("elevenlabs_key", "")?.trim().orEmpty()
+        val apiKey = KeyVault.elevenlabs
 
         if (apiKey.isBlank()) {
             SystemLogsManager.addLog("WARN", "مفتاح ElevenLabs غير مضبوط في الإعدادات.", Color(0xFFE8C547))
@@ -1571,7 +1613,7 @@ object AppServices {
 
     suspend fun getTrendingIdeas(): List<TrendingIdea> = withContext(Dispatchers.IO) {
         val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
-        val apiKey = prefs.getString("gemini_key", "") ?: ""
+        val apiKey = KeyVault.gemini
 
         val defaultIdeas = listOf(
             TrendingIdea(title = "قصص الأنبياء - العبرة الخالدة", description = "فيديوهات قصيرة سينمائية تسرد مواقف الصبر واليقين", viralityScore = 96, tags = listOf("قصص", "إيمان", "عبرة")),

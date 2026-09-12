@@ -58,7 +58,8 @@ object OperationalReadinessManager {
         val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
 
         fun getKey(name: String): String {
-            return customKeys?.get(name) ?: prefs.getString(name, "") ?: ""
+            // المفتاح الفعّال: مدخل المستخدم أولاً ثم المفتاح المحقون من البناء (BuildConfig)
+            return customKeys?.get(name)?.takeIf { it.isNotBlank() } ?: KeyVault.effective(name)
         }
 
         fun isKeyValid(key: String): Boolean {

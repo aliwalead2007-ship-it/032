@@ -35,13 +35,14 @@ object AppSelfDoctor {
         }
 
         // 1. API Keys Diagnosis
-        val geminiKey = prefs.getString("gemini_key", "") ?: ""
-        val groqKey = prefs.getString("groq_key", "") ?: ""
-        val elevenLabsKey = prefs.getString("elevenlabs_key", "") ?: ""
-        val azureKey = prefs.getString("azure_speech_key", "") ?: ""
-        val huggingFaceKey = prefs.getString("huggingface_key", "") ?: ""
-        val pexelsKey = prefs.getString("pexels_key", "") ?: ""
-        val pixabayKey = prefs.getString("pixabay_key", "") ?: ""
+        // المفاتيح الفعّالة عبر KeyVault (شاشة المفاتيح أولاً ثم BuildConfig من Secrets)
+        val geminiKey = KeyVault.gemini
+        val groqKey = KeyVault.groq
+        val elevenLabsKey = KeyVault.elevenlabs
+        val azureKey = KeyVault.azureSpeechKey
+        val huggingFaceKey = KeyVault.huggingface
+        val pexelsKey = KeyVault.pexels
+        val pixabayKey = KeyVault.pixabay
         val firebaseKey = prefs.getString("firebase_key", "") ?: ""
 
         if (!isKeyValid(geminiKey)) {
