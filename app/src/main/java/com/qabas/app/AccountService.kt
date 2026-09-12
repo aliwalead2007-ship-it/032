@@ -110,10 +110,7 @@ class AccountService(private val context: Context) {
         get() = !isDeveloperOrAdmin && strikeCount >= MAX_STRIKES
 
     val isMaintenanceMode: Boolean
-        get() {
-            val qabasPrefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
-            return qabasPrefs.getBoolean("sys_maintenance_mode", false)
-        }
+        get() = AppRemoteConfig.current(context).maintenanceMode
 
     var isDevWatermarkEnabled: Boolean
         get() {
@@ -158,19 +155,10 @@ class AccountService(private val context: Context) {
         }
 
     val isAutoAiReplyEnabled: Boolean
-        get() {
-            val qabasPrefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
-            return qabasPrefs.getBoolean("sys_auto_ai_reply", true)
-        }
+        get() = AppRemoteConfig.current(context).autoAiReply
 
     val maintenanceMessage: String
-        get() {
-            val qabasPrefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
-            return qabasPrefs.getString(
-                "sys_maintenance_message", 
-                "الخدمة متوقفة مؤقتاً للتحديث والصيانة، يرجى المحاولة لاحقاً."
-            ) ?: "الخدمة متوقفة مؤقتاً للتحديث والصيانة، يرجى المحاولة لاحقاً."
-        }
+        get() = AppRemoteConfig.current(context).maintenanceMessage
 
     fun canGenerateVideo(): Boolean {
         if (isDeveloperOrAdmin || hasCustomKeys) return true

@@ -48,7 +48,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 
-enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN, API_KEYS }
+enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN, API_KEYS, AUDIT_LOG, BACKUP }
 
 data class DevUser(
     val id: String,
@@ -105,6 +105,32 @@ object DevDashboardFormatters {
 fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = {}) {
     var currentSection by remember { mutableStateOf(DashboardSection.MAIN) }
 
+    // حارس الوصول: اللوحة للمالك فقط (لا يُمنح علم is_developer افتراضياً لأجهزة جديدة)
+    val gateContext = LocalContext.current
+    val accessAllowed = remember { AdminGuard.isDashboardAccessAllowed(gateContext) }
+    if (!accessAllowed) {
+        Column(
+            modifier = Modifier.fillMaxSize().background(DeepSlate).padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(Icons.Default.Lock, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(48.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("لوحة تحكم المطور محمية 🔒", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                "الوصول مخصص لحساب المالك فقط. سجّل الدخول ببريد المالك، أو استخدم جهازاً يحمل علم is_developer المكتوب سابقاً.",
+                color = TextSecondary, fontFamily = NotoSansFont, fontSize = 13.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Button(onClick = onBack, colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary)) {
+                Text("رجوع", color = DeepSlate, fontFamily = CairoFont, fontWeight = FontWeight.Bold)
+            }
+        }
+        return
+    }
+
     val handleBack = {
         if (currentSection == DashboardSection.MAIN) {
             onBack()
@@ -130,6 +156,8 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                             DashboardSection.ACCOUNT_SETTINGS -> "إعدادات حساب المطور"
                             DashboardSection.PROMO_CODES -> "المكافآت والأكواد"
                             DashboardSection.REVENUE -> "المبيعات والإيرادات"
+                            DashboardSection.AUDIT_LOG -> "سجل التدقيق 📋"
+                            DashboardSection.BACKUP -> "نسخ احتياطي واسترجاع 📦"
                             DashboardSection.DEV_STUDIO_SIGNATURE -> "استوديو إنتاج المطور وتوقيع الفيديوهات ✦"
                             DashboardSection.AGENCY_MONETIZATION -> "استوديو وكالة الأرباح والخدمات المدفوعة 💰"
                             DashboardSection.DEV_PORTFOLIO_SHOWCASE -> "معرض وبروفايل أعمال المطور ✦"
@@ -275,6 +303,8 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                         onAppDoctor = { currentSection = DashboardSection.APP_DOCTOR },
                         onStyleBrain = { currentSection = DashboardSection.STYLE_BRAIN },
                         onApiKeys = { currentSection = DashboardSection.API_KEYS },
+                        onAuditLog = { currentSection = DashboardSection.AUDIT_LOG },
+                        onBackup = { currentSection = DashboardSection.BACKUP },
                         userCount = devUsers.size
                     )
                 }
@@ -314,7 +344,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                     NotificationsSection(context = context)
                 }
                 DashboardSection.USERS -> {
-                    UsersSection(context = context, devUsers = devUsers)
+                    EnhancedUsersSection(context = context, devUsers = devUsers)
                 }
                 DashboardSection.STATS -> {
                     StatsSection(requests = requests, userCount = devUsers.size)
@@ -329,7 +359,13 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                     PromoCodesSection(context = context)
                 }
                 DashboardSection.REVENUE -> {
-                    RevenueSection(context = context)
+                    RevenueDashboard(context = context)
+                }
+                DashboardSection.AUDIT_LOG -> {
+                    AuditLogSection(context = context)
+                }
+                DashboardSection.BACKUP -> {
+                    DashboardBackupSection()
                 }
             }
         }
@@ -354,6 +390,8 @@ fun DashboardMainGrid(
 onAppDoctor: () -> Unit,
                         onStyleBrain: () -> Unit,
                         onApiKeys: () -> Unit,
+                        onAuditLog: () -> Unit = {},
+                        onBackup: () -> Unit = {},
                         userCount: Int = 0
                     ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -466,7 +504,9 @@ onAppDoctor: () -> Unit,
             Triple("التحكم في النظام", Icons.Default.Settings, onSystemControls),
             Triple("سجل الانهيارات 🛡️", Icons.Default.BugReport, onCrashLogs),
             Triple("إعدادات حساب المطور", Icons.Default.ManageAccounts, onAccountSettings),
-            Triple("مفاتيح API 🔑", Icons.Default.VpnKey, onApiKeys)
+            Triple("مفاتيح API 🔑", Icons.Default.VpnKey, onApiKeys),
+            Triple("سجل التدقيق 📋", Icons.Default.History, onAuditLog),
+            Triple("نسخ احتياطي واسترجاع 📦", Icons.Default.Backup, onBackup)
         )
 
         LazyVerticalGrid(
@@ -636,12 +676,25 @@ fun RequestsSection(
 
 @Composable
 fun SystemControlsSection(context: Context) {
-    val prefs = remember { context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE) }
-    var isMaintenanceMode by remember { mutableStateOf(prefs.getBoolean("sys_maintenance_mode", false)) }
-    var acceptNewRequests by remember { mutableStateOf(prefs.getBoolean("sys_accept_requests", true)) }
-    var autoAiReply by remember { mutableStateOf(prefs.getBoolean("sys_auto_ai_reply", true)) }
-    var customMessage by remember { 
-        mutableStateOf(prefs.getString("sys_maintenance_message", "الخدمة متوقفة مؤقتاً للتحديث والصيانة، يرجى المحاولة لاحقاً.") ?: "الخدمة متوقفة مؤقتاً للتحديث والصيانة، يرجى المحاولة لاحقاً.") 
+    val initial = AppRemoteConfig.current(context)
+    var isMaintenanceMode by remember { mutableStateOf(initial.maintenanceMode) }
+    var acceptNewRequests by remember { mutableStateOf(initial.acceptRequests) }
+    var autoAiReply by remember { mutableStateOf(initial.autoAiReply) }
+    var customMessage by remember { mutableStateOf(initial.maintenanceMessage) }
+    var syncState by remember { mutableStateOf(
+        if (initial.lastSyncMs > 0) "آخر مزامنة سحابية: ${AuditLogger.formatTime(initial.lastSyncMs)}" else "لم تتم المزامنة مع السحابة بعد"
+    ) }
+    val controllerScope = rememberCoroutineScope()
+
+    fun updateConfig(next: AppRemoteConfig.ConfigData) {
+        controllerScope.launch {
+            val pushed = AppRemoteConfig.pushToCloud(context, next)
+            syncState = if (pushed) {
+                "تم الحفظ سحابياً ☁️ — جميع الأجهزة ستقرأ القيمة الجديدة"
+            } else {
+                "تم الحفظ محلياً فقط (لا توجد سحابة مفعّلة) — الأجهزة الأخرى لن تتأثر"
+            }
+        }
     }
 
     Column(
@@ -665,17 +718,17 @@ fun SystemControlsSection(context: Context) {
             }
             Switch(
                 checked = isMaintenanceMode,
-                onCheckedChange = { 
+                onCheckedChange = {
                     isMaintenanceMode = it
-                    prefs.edit().putBoolean("sys_maintenance_mode", it).apply()
-                    Toast.makeText(context, if (it) "تم تفعيل وضع الصيانة" else "تم إيقاف وضع الصيانة", Toast.LENGTH_SHORT).show()
+                    updateConfig(AppRemoteConfig.current(context).copy(maintenanceMode = it))
+                    Toast.makeText(context, if (it) "جاري تفعيل وضع الصيانة..." else "جاري إيقاف وضع الصيانة...", Toast.LENGTH_SHORT).show()
                 },
                 colors = SwitchDefaults.colors(checkedThumbColor = GoldPrimary, checkedTrackColor = GoldSecondary)
             )
         }
-        
+
         HorizontalDivider(color = Color(0xFF1E293B))
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -687,17 +740,17 @@ fun SystemControlsSection(context: Context) {
             }
             Switch(
                 checked = acceptNewRequests,
-                onCheckedChange = { 
+                onCheckedChange = {
                     acceptNewRequests = it
-                    prefs.edit().putBoolean("sys_accept_requests", it).apply()
-                    Toast.makeText(context, if (it) "تم السماح باستقبال الطلبات" else "تم إيقاف استقبال الطلبات", Toast.LENGTH_SHORT).show()
+                    updateConfig(AppRemoteConfig.current(context).copy(acceptRequests = it))
+                    Toast.makeText(context, if (it) "جاري السماح باستقبال الطلبات..." else "جاري إيقاف استقبال الطلبات...", Toast.LENGTH_SHORT).show()
                 },
                 colors = SwitchDefaults.colors(checkedThumbColor = GoldPrimary, checkedTrackColor = GoldSecondary)
             )
         }
-        
+
         HorizontalDivider(color = Color(0xFF1E293B))
-        
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -709,10 +762,10 @@ fun SystemControlsSection(context: Context) {
             }
             Switch(
                 checked = autoAiReply,
-                onCheckedChange = { 
+                onCheckedChange = {
                     autoAiReply = it
-                    prefs.edit().putBoolean("sys_auto_ai_reply", it).apply()
-                    Toast.makeText(context, if (it) "تم تفعيل الرد الآلي" else "تم تعطيل الرد الآلي", Toast.LENGTH_SHORT).show()
+                    updateConfig(AppRemoteConfig.current(context).copy(autoAiReply = it))
+                    Toast.makeText(context, if (it) "جاري تفعيل الرد الآلي..." else "جاري تعطيل الرد الآلي...", Toast.LENGTH_SHORT).show()
                 },
                 colors = SwitchDefaults.colors(checkedThumbColor = GoldPrimary, checkedTrackColor = GoldSecondary)
             )
@@ -720,7 +773,6 @@ fun SystemControlsSection(context: Context) {
 
         HorizontalDivider(color = Color(0xFF1E293B))
 
-        // Custom Message Section
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("رسالة توقف الخدمة المخصصة (تظهر للمستخدمين)", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Text("سيتم إظهار هذا النص للمستخدمين عند تفعيل وضع الصيانة أو إيقاف الخدمة.", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 12.sp)
@@ -739,7 +791,6 @@ fun SystemControlsSection(context: Context) {
                 minLines = 2
             )
 
-            // Preset Quick Selection Chips
             Text("نماذج جاهزة للرسائل:", color = Color.Gray, fontFamily = NotoSansFont, fontSize = 12.sp)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -766,8 +817,7 @@ fun SystemControlsSection(context: Context) {
 
             Button(
                 onClick = {
-                    prefs.edit().putString("sys_maintenance_message", customMessage).apply()
-                    Toast.makeText(context, "تم حفظ رسالة الصيانة المخصصة بنجاح!", Toast.LENGTH_SHORT).show()
+                    updateConfig(AppRemoteConfig.current(context).copy(maintenanceMessage = customMessage))
                 },
                 modifier = Modifier.fillMaxWidth().height(44.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
@@ -775,8 +825,21 @@ fun SystemControlsSection(context: Context) {
             ) {
                 Icon(Icons.Default.Save, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("حفظ نص الرسالة", color = Color.Black, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text("حفظ نص الرسالة سحابياً", color = Color.Black, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
+        }
+
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0B0F19)),
+            shape = RoundedCornerShape(10.dp)
+        ) {
+            Text(
+                syncState,
+                color = GoldSecondary,
+                fontFamily = NotoSansFont,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(12.dp)
+            )
         }
     }
 }
@@ -787,6 +850,7 @@ fun NotificationsSection(context: Context) {
     var notifMessage by remember { mutableStateOf("") }
     var sentNotifications by remember { mutableStateOf(AppNotificationService.getNotifications(context)) }
     var isDailyHadithEnabled by remember { mutableStateOf(AppNotificationService.isDailyHadithEnabled(context)) }
+    val notificationScope = rememberCoroutineScope()
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Daily Hadith Auto Notification Switch Card
@@ -893,11 +957,18 @@ fun NotificationsSection(context: Context) {
                 Button(
                     onClick = {
                         if (notifTitle.isNotBlank() && notifMessage.isNotBlank()) {
-                            AppNotificationService.sendNotification(context, notifTitle, notifMessage)
+                            val title = notifTitle
+                            val message = notifMessage
+                            AppNotificationService.sendNotification(context, title, message)
                             sentNotifications = AppNotificationService.getNotifications(context)
+                            notificationScope.launch {
+                                val id = RemoteNotificationsManager.sendBroadcast(context, title, message)
+                                val toast = if (id != null) "تم بث الإشعار سحابياً لجميع الأجهزة ✅"
+                                    else "عُرض محلياً فقط: ${RemoteNotificationsManager.lastSendResult.value}"
+                                Toast.makeText(context, toast, Toast.LENGTH_LONG).show()
+                            }
                             notifTitle = ""
                             notifMessage = ""
-                            Toast.makeText(context, "تم إرسال الإشعار بنجاح!", Toast.LENGTH_SHORT).show()
                         } else {
                             Toast.makeText(context, "الرجاء تعبئة العنوان والنص", Toast.LENGTH_SHORT).show()
                         }

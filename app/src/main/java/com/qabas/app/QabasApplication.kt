@@ -2,6 +2,10 @@ package com.qabas.app
 
 import android.app.Application
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import com.google.firebase.FirebaseApp
 import com.google.firebase.analytics.FirebaseAnalytics
 
@@ -66,6 +70,12 @@ class QabasApplication : Application() {
 
         // Initialize core application services
         AppServices.init(this)
+
+        // مهام بدء التشغيل: تحديث الإعدادات البعيدة + استقبال إشعارات البث السحابية
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            runCatching { AppRemoteConfig.refreshFromCloud(this@QabasApplication) }
+            runCatching { RemoteNotificationsManager.startInbox(this@QabasApplication) }
+        }
     }
 
     override fun onTerminate() {

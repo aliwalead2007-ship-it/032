@@ -311,6 +311,20 @@
 | Manifest | إضافة `<queries>` لـ `ACTION_VIEW` مع `https` و`http` (إعلان صريح لرؤية المتصفحات). |
 | الملفات | `AndroidManifest.xml`، `app/src/main/java/com/qabas/app/ApiKeysScreen.kt`، `AGENTS.md`، `README.md`. |
 
+### ط) تحويل لوحة المطور إلى لوحة تحكم سحابية كاملة (سبتمبر 2026)
+
+| عنصر | ماذا أُنجز |
+|-----|------------|
+| حارس الوصول (`AdminGuard.kt`) | `is_developer` لم يعد مفعّلاً افتراضياً لأي جهاز. الوصول يتحقق: (1) بريد Firebase Auth == بريد المالك، أو (2) العلم مكتوب صراحةً في prefs. شاشة حظر واضحة لأي مستخدم غير مؤهَّل. |
+| التحكم البعيد (`AppRemoteConfig.kt`) | أزرار الصيانة/استقبال الطلبات/الرد الآلي/رسالة التوقف تُكتب الآن إلى Firestore (`app_config/config`) وينعكس على كل الأجهزة عبر كاش محلي. لا تحكم محلي فقط بعد الآن. |
+| سجل التدقيق (`AuditLogger.kt`) | كل إجراء حساس (رتبة، إيقاف، أكواد، بث إشعار، تصدير) يُسجَّل محلياً + سحابياً مع البصمة والوقت، ويُعرض في قسم «سجل التدقيق 📋» داخل اللوحة. |
+| إدارة المستخدمين المتقدمة (`EnhancedUsersSection.kt`) | فلترة حسب الرتبة/الحالة، تفاصيل المستخدم، تأكيد قبل تغيير الرتبة أو الإيقاف، تصدير CSV، إضافة مستخدم سحابياً — مع تسجيل تدقيق. |
+|الإيرادات المتقدمة (`RevenueDashboard.kt`) | رسم بياني شهري (Canvas)، تقسيم حسب المنتج، إجمالي معاملات حقيقي (Firestore)، تصدير CSV. |
+| الإشعارات البعيد (`RemoteNotificationsManager.kt`) | البث السحابي: المستند يُكتب في Firestore `notifications` ويتلقاه كل الأجهزة عبر listener ويعرض إشعاراً محلياً بدون تكرار. لا إشعار محلي فقط بعد الآن. |
+| نسخ احتياطي (`DashboardBackup.kt`) | تصدير JSON كامل (مستخدمون + أكواد + إعدادات) عبر CreateDocument. |
+| بنية الملفات | مكونات جديدة في ملفات مستقلة بدل الاحتكام في `DeveloperDashboardScreen.kt` (3534 سطر): `AdminGuard.kt`، `AppRemoteConfig.kt`، `AuditLogger.kt`، `EnhancedUsersSection.kt`، `RevenueDashboard.kt`، `RemoteNotificationsManager.kt`، `DashboardBackupSection.kt`، `AuditLogSection.kt`. |
+| الملفات | `QabasApplication.kt` (مهام بدء التشغيل)، `AccountService.kt` (قراءة بعيدة)، `DeveloperDashboardScreen.kt` (واجهة حماية + أقسام جديدة)، `AGENTS.md`، `README.md`. |
+
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
@@ -400,6 +414,7 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 > **سبتمبر 2026:** Gemini ↑ 2.0-flash، دمج FFmpeg حقيقي، تعليق صوتي مجاني دائماً (TTS النظام)، توثيق مجانيّ في `.env.example`، CI أخضر.
 > **سبتمبر 2026 (إصلاح FlowRow):** تثبيت `foundation`/`foundation-layout` 1.9.0 صريحاً لإزالة `NoSuchMethodError` على `FlowRow` في شاشات الملف الشخصي والتجويد والفهم والهاشتاقات. `versionCode = 3`، `versionName = 1.2.1`.  
 > **سبتمبر 2026 (زر «فتح الموقع»):** `openUrl` موحّدة ببدائل متصفحات صريحة + `<queries>` في Manifest — لا «تعذر فتح الرابط» مبهم بعد الآن.
+> **سبتمبر 2026 (لوحة تحكم سحابية كاملة):** إغلاق أمني للوحة (`AdminGuard`)، تحكم بعيد (`AppRemoteConfig` → Firestore)، سجل تدقيق، إدارة مستخدمين متقدمة (فلترة/تأكيد/CSV)، إشعارات سحابية (`RemoteNotificationsManager`)، نسخ احتياطي، رسم إيرادات شهري.
 > شاشة المفاتيح اكتملت لكل الطبقة المجانية (Azure + ElevenLabs وبطاقة «يعمل بلا مفاتيح»).  
 > **UI سبتمبر 2026:** انتقال أنيميشن بين الشاشات (`AnimatedContent` slide+fade)، مكوّنا `QabasCard`/`QabasSectionHeader` مع اعتمادها في المشاريع، وتغطية تحقق المفاتيح بالعداد — CI أخضر للدفعة (`7542c0e`).  
 > **طبقة سحابية (سبتمبر 2026):** ربط Supabase الفعلي — `.env` بقيم حقيقية محلياً، تحقق قراءة/كتابة/حذف حي، `isConfigured` محصّن ضد placeholder، وCI جاهز لحقن السرّين (يعمل محلياً حتى بدونهما).  
