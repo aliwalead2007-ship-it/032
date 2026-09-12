@@ -292,11 +292,21 @@
 | التوثيق | صف الحزمة في `README.md` (§ البنية) صار `com.qabas.app`، ومسار القسم 7 في `AGENTS.md` (الملفات الحساسة) صار `app/src/main/java/com/qabas/app/…`. |
 | التحقق | grep شامل بلا أي بقايا `com.example` أو `com/example` خارج git history (الملف الوحيد فيه مذكور تاريخي هو `.beads/issues.jsonl` — تصدير سلبي لا يُعدَّل). بناء محلي **لم يُعمل** في هذه الجلسة لغياب JDK/SDK عنها — يُثبَّت بعد هذا العمل على جهاز فيه أدوات أندرويد. |
 
+### ش) تثبيت إصدار Compose Foundation وإصلاح انهيار FlowRow (سبتمبر 2026)
+
+| عنصر | ماذا أُنجز |
+|-----|------------|
+| المشكلة | `java.lang.NoSuchMethodError` على `FlowRow` في `ProfileScreen.kt:424` (وأيضاً `QuranTajweedScreen`، `UnderstandingScreen`، `ViralSeoHashtagEngine`). السبب: عدم تطابق إصدار `foundation-layout` بين التصرّيف والتشغيل — الكود مُصرَّف على `FlowRow` المستقر (1.8+ بتوقيع `FlowRowOverflow`) بينما APK الجهاز فيه `FlowLayoutKt` أقدم بلا هذا التوقيع. |
+| الجذر | `composeBom = "2024.09.00"` يحلّ `foundation-layout` ~1.7.x متعدياً، بينما `compose.ui` انحل فعلياً إلى `1.9.0` (تجاوز BOM بالصراع — موثّق سابقاً). لا يوجد `foundation` أو `foundation-layout` في `build.gradle.kts` صريحاً ← الحل التعدي غير الحاسم. |
+| الإصلاح | تثبيت `foundation` و`foundation-layout` على `1.9.0` في `gradle/libs.versions.toml` (إصدارات ومكتبات صريحة) + إضافة `implementation(libs.androidx.compose.foundation)` و`implementation(libs.androidx.compose.foundation.layout)` في `app/build.gradle.kts`. |
+| الإصدار | `versionCode = 3`، `versionName = "1.2.1"` — APK جديد يثبت فوق 1.2.0. |
+| الملفات | `gradle/libs.versions.toml`، `app/build.gradle.kts`، `AGENTS.md`، `README.md`. |
+
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
 
-**بناء أخضر عبر Actions → تثبيت APK → اختبار تصدير كامل على الجهاز** (بعد إصلاح تعطل الإنتاج ومهلة المحرك والدمج البديل وإصلاح التجميع أعلاه — الإصلاحات تحتاج APK جديداً ليصل الجهاز).
+**بناء أخضر عبر Actions → تثبيت APK → اختبار شاشات FlowRow (الملف الشخصي/التجويد/الفهم/الهاشتاقات) + اختبار تصدير كامل على الجهاز** (بعد إصلاح تعطل الإنتاج ومهلة المحرك والدمج البديل وإصلاح التجميع أعلاه — الإصلاحات تحتاج APK جديداً ليصل الجهاز).
 
 **يعتمد على ما يبلّغ به المستخدم بعد التجربة:**
 
@@ -378,7 +388,8 @@ app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 > المسار محصَّن في الكود؛ آية الدخول والسبلاش جاهزان؛ لوحة المطور خالية من البيانات المزيفة (مستخدمون/إيرادات/استهلاك API/عدّ أسبوعي حقيقي).  
 > **الأولوية:** نتيجة اختبار التصدير على الجهاز → ثم إصلاح أو تقوية offline فقط.  
 > لوحة المطور: 14 نقطة HTTP ملفوفة بـ `ApiUsageTracker` (انضمّت Azure TTS وElevenLabs من شاشة المفاتيح)، وتحميل فعلي من Firestore/Supabase/Room.  
-> **سبتمبر 2026:** Gemini ↑ 2.0-flash، دمج FFmpeg حقيقي، تعليق صوتي مجاني دائماً (TTS النظام)، توثيق مجانيّ في `.env.example`، CI أخضر.  
+> **سبتمبر 2026:** Gemini ↑ 2.0-flash، دمج FFmpeg حقيقي، تعليق صوتي مجاني دائماً (TTS النظام)، توثيق مجانيّ في `.env.example`، CI أخضر.
+> **سبتمبر 2026 (إصلاح FlowRow):** تثبيت `foundation`/`foundation-layout` 1.9.0 صريحاً لإزالة `NoSuchMethodError` على `FlowRow` في شاشات الملف الشخصي والتجويد والفهم والهاشتاقات. `versionCode = 3`، `versionName = 1.2.1`.  
 > شاشة المفاتيح اكتملت لكل الطبقة المجانية (Azure + ElevenLabs وبطاقة «يعمل بلا مفاتيح»).  
 > **UI سبتمبر 2026:** انتقال أنيميشن بين الشاشات (`AnimatedContent` slide+fade)، مكوّنا `QabasCard`/`QabasSectionHeader` مع اعتمادها في المشاريع، وتغطية تحقق المفاتيح بالعداد — CI أخضر للدفعة (`7542c0e`).  
 > **طبقة سحابية (سبتمبر 2026):** ربط Supabase الفعلي — `.env` بقيم حقيقية محلياً، تحقق قراءة/كتابة/حذف حي، `isConfigured` محصّن ضد placeholder، وCI جاهز لحقن السرّين (يعمل محلياً حتى بدونهما).  
