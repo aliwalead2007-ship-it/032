@@ -22,7 +22,7 @@ class AccountService(private val context: Context) {
         get() {
             val qabasPrefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
             val isAdmin = qabasPrefs.getBoolean("is_admin", false)
-            val isDev = qabasPrefs.getBoolean("is_developer", true) // Default developer mode enabled
+            val isDev = qabasPrefs.getBoolean("is_developer", false) // لا يُمنح افتراضياً — فقط من كُتب له (المالك/العلامة المكتوبة مسبقاً)
             return isAdmin || isDev
         }
 
