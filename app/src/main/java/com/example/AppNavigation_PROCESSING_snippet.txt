@@ -1,1 +1,0 @@
-NOTE: This is a marker. Actual fix applied to AppNavigation.kt - remove line mediaResources = state.mediaResources,

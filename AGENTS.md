@@ -278,6 +278,19 @@
 | التسامح | `is_developer` افتراضياً `true` عند غياب المفتاح (وضع المطور مفعّل منذ البداية)؛ لا قفل للمطور القديم لأن الجهاز المخوَّل سابقاً محتفظ بعلامته المكتوبة قبل التحديث. |
 | التحقق | grep على `app/src/main` بلا مطابقة لـ `aly750834\|peeesa7\|family@qabas\|friend@qabas\|admin@qabas\|isDevEmail\|contains("admin")`؛ `DeveloperDashboardScreen.kt:411` تبقى تسمية عرض فقط («المطور الرئيسي: aliwalead.2007») لا تُوصِل صلاحية. |
 
+### ر) توحيد الحزمة على `com.qabas.app` — إزالة `com.example` (سبتمبر 2026)
+
+| عنصر | ماذا أُنجز |
+|-----|------------|
+| القديم | حزمة الجذر كانت `com.example` بينما `namespace`/`applicationId` في `app/build.gradle.kts` = `com.qabas.app` (سطر 13/17) → تعارض فئة `R` المولَّدة يهدم البناء. |
+| النقل | `git mv` لثلاثة جذور شيفرة: `app/src/main/java/com/example` → `app/src/main/java/com/qabas/app` (132 ملف Kotlin + `ui/theme` + `ui/input`)، و`app/src/test/java/com/example` → `app/src/test/java/com/qabas/app`، و`app/src/androidTest/java/com/example` → `app/src/androidTest/java/com/qabas/app`. |
+| الإعلانات/الاستيرادات | sed شامل: `^package com.example` → `package com.qabas.app` و`^import com.example` → `import com.qabas.app` في كل `*.kt` (منها `Type.kt` الذي كان يستورد `com.example.R`). التوزيع النهائي: 123 × `com.qabas.app` + 6 × `ui.input` + 3 × `ui.theme`. |
+| `DeveloperDashboardScreen.kt` | فلتر أول إطار للـ crash stack `at com.example.` → `at com.qabas.app.` (سطر 2150 + التعليق 2143) — إصلاح وظيفي لقراءة سجلات الانهيار. |
+| `ExampleInstrumentedTest.kt` | تشخيص `packageName` في اختبار الأجهزة: `assertEquals("com.example", …)` → `"com.qabas.app"`. |
+| حذف | ملف الشظية الضال `app/src/main/java/com/example/AppNavigation_PROCESSING_snippet.txt` (منتج نصي لمقارنة Diff لا يُجمَّع) — `git rm -qf`. |
+| التوثيق | صف الحزمة في `README.md` (§ البنية) صار `com.qabas.app`، ومسار القسم 7 في `AGENTS.md` (الملفات الحساسة) صار `app/src/main/java/com/qabas/app/…`. |
+| التحقق | grep شامل بلا أي بقايا `com.example` أو `com/example` خارج git history (الملف الوحيد فيه مذكور تاريخي هو `.beads/issues.jsonl` — تصدير سلبي لا يُعدَّل). بناء محلي **لم يُعمل** في هذه الجلسة لغياب JDK/SDK عنها — يُثبَّت بعد هذا العمل على جهاز فيه أدوات أندرويد. |
+
 ---
 
 ## 4. الخطوة التالية الوحيدة الآن
@@ -348,12 +361,12 @@
 ## 7. ملفات حساسة للمسار (لا تلمسها دون قراءة)
 
 ```
-app/src/main/java/com/example/VideoProcessor.kt
-app/src/main/java/com/example/VideoEngineManager.kt
-app/src/main/java/com/example/ProcessingScreen.kt
-app/src/main/java/com/example/RealServices.kt
-app/src/main/java/com/example/ui/input/IdeaInputSection.kt
-app/src/main/java/com/example/AudioPlayerManager.kt
+app/src/main/java/com/qabas/app/VideoProcessor.kt
+app/src/main/java/com/qabas/app/VideoEngineManager.kt
+app/src/main/java/com/qabas/app/ProcessingScreen.kt
+app/src/main/java/com/qabas/app/RealServices.kt
+app/src/main/java/com/qabas/app/ui/input/IdeaInputSection.kt
+app/src/main/java/com/qabas/app/AudioPlayerManager.kt
 app/src/main/assets/audio/entry_ayah_ruj3a.m4a
 ```
 
