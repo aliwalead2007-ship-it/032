@@ -117,7 +117,7 @@
 - **CI:** `.github/workflows/android-ci.yml` — build & sign، إصلاح `gradle-wrapper.jar` تلقائياً، و«**Inject secrets**»: يكتب `.env` من أسرار GitHub إن وُجدت (بدونها يبني بوضع محلي آمن). 📦 APK يرفع كـ Artifact `qabas-debug-apk` (احتفاظ 7 أيام).
 - **بناء محلي مُتحقَّق:** `:app:assembleDebug` → BUILD SUCCESSFUL محلياً (Temurin JDK 17 + Android SDK platform 36 في `~/tooling`، `sdk.dir` في `local.properties`) — يثبت ربط كل الوظائف دون أخطاء ترجمة.
 - **حارس الانهيارات:** `QabasCrashGuard` يلتقط أي استثناء JVM غير مُتصدّى له في أي Thread → ملف `filesDir/crash_logs/` + سطر في لوحة المطور بستاك كامل، وإعادة إطلاق تلقائية محمية ضد التكرار (نافذة 15 ثانية) للـ main thread.
-- **التوقيع:** release عبر `KEYSTORE_PATH`/`STORE_PASSWORD`/`KEY_PASSWORD` أو `my-upload-key.jks` (alias `upload`)، وdebug عبر `debug.keystore`. البناء يسير unsigned إذا غابت القيم.
+- **التوقيع الثابت (إصلاح التحديث بلا حذف):** مفتاح PKCS12 ثابت مدمج في المستودع (`signing/qabas-ci.p12`، بيانات debug القياسية المعروفة علناً android/androiddebugkey — هوية تحديث وليس مفتاح نشر) — كل بناء debug/release موقّع به فيُثبَّت التحديث فوق النسخة القديمة مباشرة. (سابقاً كان مفتاح الـ runner يتولد من جديد كل بناء → توقيع مختلف → وجوب الحذف. النسخ المثبتة قبل الإصلاح تحتاج حذفاً أخيراً واحداً). لو نُشر مستقبلاً على متجر رسمي فيجب توليد مفتاح نشر خاص يبقى سرياً.
 - **اختبارات:** `StyleBrainTest` (عقل الأساليب) · Robolectric unit tests · Roborazzi screenshots · `ExampleInstrumentedTest`.
 
 ---

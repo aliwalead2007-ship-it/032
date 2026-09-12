@@ -31,16 +31,33 @@ android {
       if (keystoreFile.exists()) {
         storeFile = keystoreFile
         storePassword = System.getenv("STORE_PASSWORD")
-        keyAlias = "upload"
+        keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
         keyPassword = System.getenv("KEY_PASSWORD")
       }
       // else: leave unsigned / use default — CI debug builds do not need release keystore
     }
     // Prefer project debug.keystore if present; otherwise fall back to the standard Android debug keystore
+    // الأسبقية الآن: مفتاح CI الثابت (env) ← مفتاح المستودع الثابت (signing/qabas-ci.p12) ← debug.keystore المشروع ← مفتاح الـ SDK
+    // (قبل هذا التعديل كان مفتاح الـ runner يُولَّد من جديد كل بناء → توقيع مختلف → أندرويد يطلب حذف النسخة القديمة عند التحديث)
+    // مفتاح المستودع ببيانات اعتماد debug القياسية المعروفة علناً (android/androiddebugkey) — هوية تحديث ثابتة فقط وليس مفتاح نشر حساساً
     create("debugConfig") {
+      val ciKeystore = System.getenv("KEYSTORE_PATH")?.let { file(it) }
+      val repoKeystore = file("${rootDir}/signing/qabas-ci.p12")
       val projectDebug = file("${rootDir}/debug.keystore")
       val sdkDebug = file("${System.getProperty("user.home")}/.android/debug.keystore")
       when {
+        repoKeystore.exists() -> {
+          storeFile = repoKeystore
+          storePassword = "android"
+          keyAlias = "androiddebugkey"
+          keyPassword = "android"
+        }
+        ciKeystore != null && ciKeystore.exists() -> {
+          storeFile = ciKeystore
+          storePassword = System.getenv("STORE_PASSWORD") ?: "android"
+          keyAlias = System.getenv("KEY_ALIAS") ?: "qabas"
+          keyPassword = System.getenv("KEY_PASSWORD") ?: "android"
+        }
         projectDebug.exists() -> {
           storeFile = projectDebug
           storePassword = "android"
