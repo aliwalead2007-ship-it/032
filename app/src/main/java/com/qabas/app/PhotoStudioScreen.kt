@@ -5,7 +5,6 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.PickVisualMediaRequest
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -176,7 +175,7 @@ fun PhotoStudioScreen(
         when (currentStep) {
             1 -> Step1ImageSelection(
                 selectedImageUris = selectedImageUris,
-                onSelectMore = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onSelectMore = { photoPickerLauncher.launch(ActivityResultContracts.PickVisualMedia.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 onRemoveImage = { uri -> selectedImageUris = selectedImageUris.filter { it != uri } },
                 onNext = {
                     if (selectedImageUris.isNotEmpty()) {
