@@ -172,8 +172,7 @@ fun designFilterMatrixArray(filter: DesignFilter, brightness: Float, contrast: F
 }
 
 fun composeColorMatrixFrom(array: FloatArray): ColorMatrix {
-    val rows = Array(4) { row -> FloatArray(5) { col -> array[row * 5 + col] } }
-    return ColorMatrix(rows)
+    return ColorMatrix(array)
 }
 
 // ---------- الزخارف ----------
