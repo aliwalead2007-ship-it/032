@@ -2,7 +2,15 @@ package com.qabas.app
 
 import android.content.ContentValues
 import android.content.Context
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.BlurMaskFilter
+import android.graphics.Canvas
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Shader
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -14,14 +22,27 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.OutputStream
 
+/**
+ * ImageEditorEngine.kt
+ * محرك معالجة وتصدير الصور — موصول بعدة التصميم DesignDesignKit:
+ * خلفيات (صورة/سادة/تدرّج/ذكاء اصطناعي/ضبابية)، فلاتر لونية، نصوص عربية متعددة
+ * بخطوط مضمّنة، زخارف، أختيار الدقة والصيغة، وعلامة قبس القابلة للإيقاف.
+ */
+
 data class ImageAdjustmentParams(
-    val brightness: Float = 0f, // -100 to 100
-    val contrast: Float = 1f,    // 0.5 to 1.5
-    val saturation: Float = 1f,  // 0 to 2
-    val cropRatio: String = "9:16", // "Original", "9:16", "1:1", "16:9", "4:5"
-    val textOverlay: String = "",
-    val textStyleTheme: String = "GOLD_DEEP", // "GOLD_DEEP", "ROYAL_WHITE", "NEON_EMERALD"
-    val showBrandWatermark: Boolean = true
+    val brightness: Float = 0f,               // -50..50
+    val contrast: Float = 1f,                 // 0.5..1.5
+    val saturation: Float = 1f,               // 0..2
+    val cropRatio: String = "9:16",
+    val filterId: String = "original",
+    val bgMode: String = "PHOTO",             // PHOTO / SOLID / GRADIENT / AI / BLUR
+    val bgPresetHexes: List<String> = emptyList(),
+    val aiImagePath: String? = null,
+    val textBlocks: List<DesignTextBlock> = emptyList(),
+    val ornamentId: String = "none",
+    val showBrandWatermark: Boolean = true,
+    val outputFormat: String = "JPEG",        // JPEG / PNG
+    val resolutionScale: Float = 1f           // 1x=1080, 1.333f=2K, 2f=4K
 )
 
 object ImageEditorEngine {
@@ -29,84 +50,179 @@ object ImageEditorEngine {
 
     suspend fun processAndExportImage(
         context: Context,
-        inputUri: Uri,
+        inputUri: Uri?,
         params: ImageAdjustmentParams,
         targetWidth: Int = 1080,
         targetHeight: Int = 1920
     ): File? = withContext(Dispatchers.IO) {
+        var outputBitmap: Bitmap? = null
         try {
-            // 1. Decode original Bitmap
-            val inputStream = context.contentResolver.openInputStream(inputUri) ?: return@withContext null
-            val originalBitmap = BitmapFactory.decodeStream(inputStream)
-            inputStream.close()
-
-            if (originalBitmap == null) return@withContext null
-
-            // 2. Crop according to aspect ratio
-            val croppedBitmap = applyCrop(originalBitmap, params.cropRatio)
-
-            // 3. Scale to target output size
-            val (finalW, finalH) = calculateTargetDimensions(params.cropRatio, targetWidth, targetHeight)
-            val scaledBitmap = Bitmap.createScaledBitmap(croppedBitmap, finalW, finalH, true)
-
-            // 4. Create mutable canvas
-            val outputBitmap = Bitmap.createBitmap(finalW, finalH, Bitmap.Config.ARGB_8888)
+            val (finalW, finalH) = calculateTargetDimensions(params.cropRatio, targetWidth, targetHeight, params.resolutionScale)
+            outputBitmap = Bitmap.createBitmap(finalW, finalH, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(outputBitmap)
 
-            // 5. Apply Color Matrix (Brightness, Contrast, Saturation)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                isFilterBitmap = true
-                colorFilter = createColorFilter(params.brightness, params.contrast, params.saturation)
-            }
-            canvas.drawBitmap(scaledBitmap, 0f, 0f, paint)
-
-            // 6. Draw subtle Islamic / Qabas gradient vignette for readability
-            val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                shader = LinearGradient(
-                    0f, finalH * 0.45f, 0f, finalH.toFloat(),
-                    intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.argb(210, 11, 15, 25)),
-                    null,
-                    Shader.TileMode.CLAMP
+            val matrixFilter = ColorMatrixColorFilter(
+                designFilterMatrixArray(
+                    designFilterById(params.filterId),
+                    params.brightness,
+                    params.contrast,
+                    params.saturation
                 )
-            }
-            canvas.drawRect(0f, 0f, finalW.toFloat(), finalH.toFloat(), vignettePaint)
+            )
 
-            // 7. Draw Decorative Frame if 9:16 or 1:1
+            // 1. الخلفية حسب الوضع المختار
+            val srcBitmap = if (inputUri != null) decodeUri(context, inputUri) else null
+            when (params.bgMode) {
+                "SOLID", "GRADIENT" -> drawGradientBackground(canvas, finalW, finalH, params.bgPresetHexes)
+                "AI" -> {
+                    val aiPath = params.aiImagePath
+                    val aiBitmap = if (!aiPath.isNullOrBlank() && File(aiPath).exists()) {
+                        BitmapFactory.decodeFile(aiPath)
+                    } else null
+                    if (aiBitmap != null) {
+                        drawCoverBitmap(canvas, aiBitmap, finalW, finalH, matrixFilter)
+                        aiBitmap.recycle()
+                    } else {
+                        // بلا خلفية وهمية: تدرج احتياطي معتم على نفس هوية قبس
+                        drawGradientBackground(canvas, finalW, finalH, listOf("#0B0F19", "#3B2A10", "#0B0F19"))
+                    }
+                }
+                "BLUR" -> {
+                    val base = srcBitmap
+                    if (base != null) {
+                        val blurred = Bitmap.createScaledBitmap(base, finalW, finalH, true)
+                        val blurPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            isFilterBitmap = true
+                            maskFilter = BlurMaskFilter(finalW * 0.018f, BlurMaskFilter.Blur.NORMAL)
+                            colorFilter = matrixFilter
+                        }
+                        canvas.drawBitmap(blurred, 0f, 0f, blurPaint)
+                        blurred.recycle()
+                        base.recycle()
+                    } else {
+                        drawGradientBackground(canvas, finalW, finalH, listOf("#0B0F19", "#1F2937"))
+                    }
+                }
+                else -> {
+                    // PHOTO (الافتراضي)
+                    if (srcBitmap != null) {
+                        val cropped = applyCrop(srcBitmap, params.cropRatio)
+                        srcBitmap.recycle()
+                        val scaled = Bitmap.createScaledBitmap(cropped, finalW, finalH, true)
+                        cropped.recycle()
+                        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            isFilterBitmap = true
+                            colorFilter = matrixFilter
+                        }
+                        canvas.drawBitmap(scaled, 0f, 0f, paint)
+                        scaled.recycle()
+                    } else {
+                        drawGradientBackground(canvas, finalW, finalH, listOf("#0B0F19", "#3B2A10", "#0B0F19"))
+                    }
+                }
+            }
+
+            // 2. تظليل سفلي خفيف لقراءة النص (للصور فقط)
+            if (params.bgMode == "PHOTO" || params.bgMode == "BLUR") {
+                val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    shader = LinearGradient(
+                        0f, finalH * 0.45f, 0f, finalH.toFloat(),
+                        intArrayOf(android.graphics.Color.TRANSPARENT, android.graphics.Color.argb(200, 8, 10, 18)),
+                        null,
+                        Shader.TileMode.CLAMP
+                    )
+                }
+                canvas.drawRect(0f, 0f, finalW.toFloat(), finalH.toFloat(), vignettePaint)
+            }
+
+            // 3. إطار ذهبي أساسي (9:16 / 1:1)
             if (params.cropRatio == "9:16" || params.cropRatio == "1:1") {
                 val framePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = android.graphics.Color.argb(70, 232, 197, 71) // Gold #E8C547 with alpha
+                    color = android.graphics.Color.argb(70, 232, 197, 71)
                     style = Paint.Style.STROKE
-                    strokeWidth = 4f
+                    strokeWidth = 4f * params.resolutionScale
                 }
-                val inset = 24f
+                val inset = 24f * params.resolutionScale
                 canvas.drawRoundRect(RectF(inset, inset, finalW - inset, finalH - inset), 20f, 20f, framePaint)
             }
 
-            // 8. Render Arabic Text with auto-wrapping & proper typography
-            if (params.textOverlay.isNotBlank()) {
-                drawArabicTextOverlay(canvas, params.textOverlay, finalW, finalH, params.textStyleTheme)
+            // 4. الزخرفة المختارة
+            DesignOrnamentRenderer.draw(canvas, finalW, finalH, designOrnamentById(params.ornamentId))
+
+            // 5. نصوص التصميم (كل كتلة بخطها ولونها واتجاهها وموضعها)
+            for (block in params.textBlocks) {
+                DesignCanvasText.drawBlock(canvas, finalW, finalH, block, designFontTypeface(context, block.style.font))
             }
 
-            // 9. Draw Qabas Official Watermark
+            // 6. علامة قبس (قابلة للإيقاف)
             if (params.showBrandWatermark) {
-                drawBrandWatermark(canvas, finalW, finalH)
+                drawBrandWatermark(canvas, finalW, finalH, params.resolutionScale)
             }
 
-            // 10. Save to Cache and/or MediaStore
-            val outFile = File(context.cacheDir, "qabas_edited_${System.currentTimeMillis()}.jpg")
+            // 7. الحفظ
+            val isPng = params.outputFormat.equals("PNG", ignoreCase = true)
+            val ext = if (isPng) "png" else "jpg"
+            val outFile = File(context.cacheDir, "qabas_edited_${System.currentTimeMillis()}.$ext")
             val fos = FileOutputStream(outFile)
-            outputBitmap.compress(Bitmap.CompressFormat.JPEG, 95, fos)
+            if (isPng) {
+                outputBitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+            } else {
+                outputBitmap.compress(Bitmap.CompressFormat.JPEG, 95, fos)
+            }
             fos.flush()
             fos.close()
 
-            // Save copy to MediaStore Gallery as well
-            saveImageToGallery(context, outputBitmap, "Qabas_Studio_${System.currentTimeMillis()}")
-
+            saveImageToGallery(context, outputBitmap, "Qabas_Studio_${System.currentTimeMillis()}", isPng)
             return@withContext outFile
         } catch (e: Exception) {
             Log.e(TAG, "Error editing image: ${e.message}", e)
             return@withContext null
+        } finally {
+            outputBitmap?.recycle()
         }
+    }
+
+    private fun decodeUri(context: Context, uri: Uri): Bitmap? {
+        return try {
+            val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+            val bmp = BitmapFactory.decodeStream(inputStream)
+            inputStream.close()
+            bmp
+        } catch (e: Exception) {
+            Log.w(TAG, "decodeUri failed: ${e.message}")
+            null
+        }
+    }
+
+    private fun drawGradientBackground(canvas: Canvas, w: Int, h: Int, hexes: List<String>) {
+        val colors = if (hexes.isNullOrEmpty()) intArrayOf(
+            android.graphics.Color.parseColor("#0B0F19"),
+            android.graphics.Color.parseColor("#3B2A10")
+        ) else hexes.map { runCatching { android.graphics.Color.parseColor(it) }.getOrDefault(android.graphics.Color.rgb(11, 15, 25)) }.toIntArray()
+        if (colors.size == 1) {
+            val solidPaint = Paint().apply { this.color = colors[0] }
+            canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), solidPaint)
+            return
+        }
+        val gradient = LinearGradient(0f, 0f, w.toFloat(), h.toFloat(), colors, null, Shader.TileMode.CLAMP)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = gradient }
+        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
+    }
+
+    private fun drawCoverBitmap(canvas: Canvas, src: Bitmap, w: Int, h: Int, filter: android.graphics.ColorFilter?) {
+        val srcW = src.width
+        val srcH = src.height
+        if (srcW <= 0 || srcH <= 0) return
+        val scale = maxOf(w.toFloat() / srcW, h.toFloat() / srcH)
+        val dw = (srcW * scale).toInt()
+        val dh = (srcH * scale).toInt()
+        val left = ((w - dw) / 2f)
+        val top = ((h - dh) / 2f)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            isFilterBitmap = true
+            colorFilter = filter
+        }
+        canvas.drawBitmap(src, null, RectF(left, top, left + dw, top + dh), paint)
     }
 
     private fun applyCrop(src: Bitmap, cropRatio: String): Bitmap {
@@ -118,7 +234,7 @@ object ImageEditorEngine {
             "1:1" -> 1f
             "16:9" -> 16f / 9f
             "4:5" -> 4f / 5f
-            else -> return src // Original
+            else -> return src
         }
 
         val srcRatio = srcW.toFloat() / srcH.toFloat()
@@ -128,11 +244,9 @@ object ImageEditorEngine {
         var cropY = 0
 
         if (srcRatio > targetRatio) {
-            // Source is wider than target ratio
             cropW = (srcH * targetRatio).toInt()
             cropX = (srcW - cropW) / 2
         } else {
-            // Source is taller than target ratio
             cropH = (srcW / targetRatio).toInt()
             cropY = (srcH - cropH) / 2
         }
@@ -143,125 +257,52 @@ object ImageEditorEngine {
         return Bitmap.createBitmap(src, cropX, cropY, cropW, cropH)
     }
 
-    private fun calculateTargetDimensions(cropRatio: String, defaultW: Int, defaultH: Int): Pair<Int, Int> {
-        return when (cropRatio) {
+    private fun calculateTargetDimensions(cropRatio: String, defaultW: Int, defaultH: Int, scale: Float): Pair<Int, Int> {
+        val (baseW, baseH) = when (cropRatio) {
             "9:16" -> Pair(1080, 1920)
             "1:1" -> Pair(1080, 1080)
             "16:9" -> Pair(1920, 1080)
             "4:5" -> Pair(1080, 1350)
             else -> Pair(defaultW, defaultH)
         }
+        return Pair((baseW * scale).toInt(), (baseH * scale).toInt())
     }
 
-    private fun createColorFilter(brightness: Float, contrast: Float, saturation: Float): ColorFilter {
-        // Brightness matrix (-100 to 100)
-        val cmBrightness = ColorMatrix(floatArrayOf(
-            1f, 0f, 0f, 0f, brightness,
-            0f, 1f, 0f, 0f, brightness,
-            0f, 0f, 1f, 0f, brightness,
-            0f, 0f, 0f, 1f, 0f
-        ))
-
-        // Contrast matrix (0.5 to 1.5)
-        val scale = contrast
-        val translate = (-0.5f * scale + 0.5f) * 255f
-        val cmContrast = ColorMatrix(floatArrayOf(
-            scale, 0f, 0f, 0f, translate,
-            0f, scale, 0f, 0f, translate,
-            0f, 0f, scale, 0f, translate,
-            0f, 0f, 0f, 1f, 0f
-        ))
-
-        // Saturation matrix (0 to 2)
-        val cmSat = ColorMatrix().apply { setSaturation(saturation) }
-
-        val finalMatrix = ColorMatrix()
-        finalMatrix.postConcat(cmBrightness)
-        finalMatrix.postConcat(cmContrast)
-        finalMatrix.postConcat(cmSat)
-
-        return ColorMatrixColorFilter(finalMatrix)
-    }
-
-    private fun drawArabicTextOverlay(
-        canvas: Canvas,
-        text: String,
-        width: Int,
-        height: Int,
-        theme: String
-    ) {
-        val textColor = when (theme) {
-            "GOLD_DEEP" -> android.graphics.Color.parseColor("#E8C547")
-            "ROYAL_WHITE" -> android.graphics.Color.parseColor("#F8FAFC")
-            "NEON_EMERALD" -> android.graphics.Color.parseColor("#10B981")
-            else -> android.graphics.Color.WHITE
-        }
-
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = textColor
-            textSize = (width * 0.052f).coerceIn(32f, 64f)
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
-            setShadowLayer(8f, 2f, 2f, android.graphics.Color.argb(180, 0, 0, 0))
-        }
-
-        val maxLineWidth = width * 0.85f
-        val words = text.split(" ")
-        val lines = mutableListOf<String>()
-        var currentLine = ""
-
-        for (w in words) {
-            val testLine = if (currentLine.isEmpty()) w else "$currentLine $w"
-            if (textPaint.measureText(testLine) < maxLineWidth) {
-                currentLine = testLine
-            } else {
-                if (currentLine.isNotEmpty()) lines.add(currentLine)
-                currentLine = w
-            }
-        }
-        if (currentLine.isNotEmpty()) lines.add(currentLine)
-
-        val lineHeight = textPaint.textSize * 1.4f
-        val totalTextHeight = lines.size * lineHeight
-        val startY = (height / 2f) - (totalTextHeight / 2f) + (textPaint.textSize * 0.8f)
-
-        for ((index, line) in lines.withIndex()) {
-            canvas.drawText(line, width / 2f, startY + (index * lineHeight), textPaint)
-        }
-    }
-
-    private fun drawBrandWatermark(canvas: Canvas, width: Int, height: Int) {
+    private fun drawBrandWatermark(canvas: Canvas, width: Int, height: Int, scale: Float) {
         val brandPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.argb(200, 232, 197, 71) // Gold
-            textSize = (width * 0.028f).coerceIn(18f, 32f)
+            color = android.graphics.Color.argb(200, 232, 197, 71)
+            textSize = (width * 0.028f).coerceIn(18f, 32f) * scale
             textAlign = Paint.Align.CENTER
             isFakeBoldText = true
             setShadowLayer(4f, 1f, 1f, android.graphics.Color.BLACK)
         }
-        canvas.drawText("✦ قَبَس | QABAS STUDIO ✦", width / 2f, height - 40f, brandPaint)
+        canvas.drawText("✦ قَبَس | QABAS STUDIO ✦", width / 2f, height - (40f * scale), brandPaint)
     }
 
-    private fun saveImageToGallery(context: Context, bitmap: Bitmap, title: String) {
-        val filename = "$title.jpg"
+    private fun saveImageToGallery(context: Context, bitmap: Bitmap, title: String, isPng: Boolean) {
+        val ext = if (isPng) "png" else "jpg"
+        val mime = if (isPng) "image/png" else "image/jpeg"
+        val filename = "$title.$ext"
         var fos: OutputStream? = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
-                put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+                put(MediaStore.MediaColumns.MIME_TYPE, mime)
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Qabas")
             }
             context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)?.let { uri ->
                 fos = context.contentResolver.openOutputStream(uri)
             }
         } else {
-            val imagesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString() + "/Qabas"
-            val file = File(imagesDir)
-            if (!file.exists()) file.mkdir()
-            val image = File(imagesDir, filename)
-            fos = FileOutputStream(image)
+            val imagesDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES).toString() + "/Qabas"
+            )
+            if (!imagesDir.exists()) imagesDir.mkdir()
+            fos = FileOutputStream(File(imagesDir, filename))
         }
         fos?.use {
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it)
+            if (isPng) bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            else bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it)
         }
     }
 }

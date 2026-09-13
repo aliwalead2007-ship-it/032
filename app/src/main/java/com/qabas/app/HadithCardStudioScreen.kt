@@ -8,11 +8,14 @@ package com.qabas.app
  */
 
 import android.content.Context
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -30,16 +33,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
+import androidx.compose.ui.graphics.nativeCanvas
 import com.qabas.app.ui.theme.*
 import coil.compose.AsyncImage
 import kotlinx.coroutines.delay
@@ -228,6 +235,11 @@ fun HadithCardStudioScreen(
     var showBadge by remember { mutableStateOf(true) }
     var showSocialIcons by remember { mutableStateOf(true) }
     var fontSizeSp by remember { mutableStateOf(20) }
+    var selectedFont by remember { mutableStateOf(DesignFont.AMIRI) }
+    var selectedAlign by remember { mutableStateOf(DesignAlign.CENTER) }
+    var textRotation by remember { mutableFloatStateOf(0f) }
+    var ornamentId by remember { mutableStateOf("none") }
+    var showSeoDialog by remember { mutableStateOf(false) }
     var isGeneratingAi by remember { mutableStateOf(false) }
     var showCustomInputSheet by remember { mutableStateOf(false) }
     var customBgImage by remember { mutableStateOf<String?>(null) }
@@ -701,6 +713,21 @@ fun HadithCardStudioScreen(
                         )
                     }
 
+                    // زخرفة المعاينة — نفس الرسم في التصدير النهائي
+                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawIntoCanvas { canvas ->
+                            canvas.nativeCanvas?.let { native ->
+                                DesignOrnamentRenderer.draw(
+                                    native,
+                                    size.width.roundToInt(),
+                                    size.height.roundToInt(),
+                                    designOrnamentById(ornamentId),
+                                    "#E8C547"
+                                )
+                            }
+                        }
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
@@ -758,11 +785,12 @@ fun HadithCardStudioScreen(
                             Text(
                                 text = inputText,
                                 color = currentTheme.textColor,
-                                fontFamily = AmiriFont,
+                                fontFamily = designFontFamily(selectedFont),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = fontSizeSp.sp,
-                                textAlign = TextAlign.Center,
-                                lineHeight = (fontSizeSp * 1.55).sp
+                                textAlign = designTextAlign(selectedAlign),
+                                lineHeight = (fontSizeSp * 1.55).sp,
+                                modifier = Modifier.rotate(textRotation)
                             )
                         }
 
@@ -874,6 +902,119 @@ fun HadithCardStudioScreen(
                             modifier = Modifier.width(180.dp),
                             colors = SliderDefaults.colors(thumbColor = GoldPrimary, activeTrackColor = GoldPrimary)
                         )
+                    }
+
+                    HorizontalDivider(color = Color(0xFF1E293B))
+
+                    Text("الخط:", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(DesignFont.entries) { font ->
+                            val isFontSel = selectedFont == font
+                            Surface(
+                                onClick = { selectedFont = font },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isFontSel) GoldPrimary else Color(0xFF0B0F19),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isFontSel) GoldPrimary else Color(0xFF1E293B))
+                            ) {
+                                Text(
+                                    font.displayName,
+                                    color = if (isFontSel) DeepSlate else TextPrimary,
+                                    fontFamily = designFontFamily(font),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Text("المحاذاة:", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DesignAlign.entries.forEach { align ->
+                            val isAlignSel = selectedAlign == align
+                            OutlinedButton(
+                                onClick = { selectedAlign = align },
+                                modifier = Modifier.height(34.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.5.dp, if (isAlignSel) GoldPrimary else Color(0xFF1E293B)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = if (isAlignSel) GoldPrimary else Color(0xFF0B0F19),
+                                    contentColor = if (isAlignSel) DeepSlate else TextPrimary
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp)
+                            ) {
+                                Text(align.label, fontFamily = CairoFont, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("الدوران (${textRotation.toInt()}°)", color = Color.White, fontFamily = NotoSansFont, fontSize = 12.sp)
+                        Slider(
+                            value = textRotation,
+                            onValueChange = { textRotation = it },
+                            valueRange = -20f..20f,
+                            modifier = Modifier.width(180.dp),
+                            colors = SliderDefaults.colors(thumbColor = GoldPrimary, activeTrackColor = GoldPrimary)
+                        )
+                    }
+
+                    Text("زخرفة البطاقة (تظهر في التصدير النهائي):", color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(DesignOrnament.entries) { orn ->
+                            val isOrnSel = ornamentId == orn.id
+                            Surface(
+                                onClick = { ornamentId = orn.id },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isOrnSel) GoldPrimary else Color(0xFF0B0F19),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isOrnSel) GoldPrimary else Color(0xFF1E293B))
+                            ) {
+                                Text(
+                                    "${orn.icon} ${orn.label}",
+                                    color = if (isOrnSel) DeepSlate else TextPrimary,
+                                    fontFamily = CairoFont,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    HorizontalDivider(color = Color(0xFF1E293B))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = {
+                                val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val label = if (narratorText.isNotBlank()) "$narratorText\n$inputText" else inputText
+                                val fullText = "$label\n\nحكم المحدث: ${hadithStatus.ifBlank { "-" }}\nالمصدر: ${hadithSource.ifBlank { "-" }}\nتصميم عبر تطبيق قبس ✦"
+                                cm.setPrimaryClip(ClipData.newPlainText("hadith", fullText))
+                                Toast.makeText(context, "تم نسخ نص الحديث والمصدر 📋", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = GoldPrimary)
+                        ) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("نسخ الحديث", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { showSeoDialog = true },
+                            modifier = Modifier.weight(1f).height(44.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF22D3EE)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF22D3EE))
+                        ) {
+                            Icon(Icons.Default.Tag, contentDescription = null, tint = Color(0xFF22D3EE), modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("هاشتاقات", color = Color(0xFF22D3EE), fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     }
 
                     Row(
@@ -1038,7 +1179,11 @@ fun HadithCardStudioScreen(
                                     userHandle = if (showSocialIcons) userHandle else "",
                                     theme = currentTheme,
                                     aspectRatio = selectedAspect,
-                                    quality = selectedQuality
+                                    quality = selectedQuality,
+                                    font = selectedFont,
+                                    align = selectedAlign,
+                                    rotation = textRotation,
+                                    ornament = designOrnamentById(ornamentId)
                                 )
                             }
                             if (saved != null) {
@@ -1064,6 +1209,20 @@ fun HadithCardStudioScreen(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("مشاركة 🚀", color = GoldPrimary, fontFamily = TajawalFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
+            }
+
+            if (showSeoDialog) {
+                ViralSeoHashtagsDialog(
+                    context = context,
+                    initialTopicOrScript = inputText,
+                    onDismiss = { showSeoDialog = false },
+                    onApplySeoData = { _, hashtagsText ->
+                        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        cm.setPrimaryClip(ClipData.newPlainText("hashtags", hashtagsText))
+                        Toast.makeText(context, "تم نسخ الهاشتاقات المقترحة #️⃣", Toast.LENGTH_SHORT).show()
+                        showSeoDialog = false
+                    }
+                )
             }
 
             OutlinedButton(
@@ -1102,7 +1261,11 @@ private fun saveHadithCardBitmapToStorage(
     userHandle: String,
     theme: HadithTheme,
     aspectRatio: String,
-    quality: String = "4K"
+    quality: String = "4K",
+    font: DesignFont = DesignFont.AMIRI,
+    align: DesignAlign = DesignAlign.CENTER,
+    rotation: Float = 0f,
+    ornament: DesignOrnament = DesignOrnament.NONE
 ): String? {
     var bitmap: android.graphics.Bitmap? = null
     return try {
@@ -1212,12 +1375,13 @@ private fun saveHadithCardBitmapToStorage(
             canvas.drawText(narrator, width / 2f, 260f * scale, narratorPaint)
         }
 
-        // 7. Hadith Body text (Formatted, Wrapped & Centered)
+        // 7. Hadith Body text (Formatted, Wrapped, Aligned & Rotated)
         val bodyPaint = android.graphics.Paint().apply {
             isAntiAlias = true
+            typeface = designFontTypeface(context, font)
             color = android.graphics.Color.parseColor("#F8FAFC")
             textSize = 34f * scale
-            textAlign = android.graphics.Paint.Align.CENTER
+            textAlign = android.graphics.Paint.Align.LEFT
             isFakeBoldText = true
         }
 
@@ -1238,11 +1402,25 @@ private fun saveHadithCardBitmapToStorage(
         if (currentLine.isNotEmpty()) lines.add(currentLine)
 
         val lineHeight = 56f * scale
-        var yPos = (height / 2f) - ((lines.size * lineHeight) / 2f) + (20f * scale)
+        val centerX = width / 2f
+        val centerY = height / 2f
+        val totalH = lines.size * lineHeight
+        var yPos = centerY - (totalH / 2f) + (20f * scale)
+        val rightEdge = width - (110f * scale)
+        val leftEdge = (110f * scale)
+        canvas.save()
+        canvas.rotate(rotation, centerX, centerY)
         for (line in lines) {
-            canvas.drawText(line, width / 2f, yPos, bodyPaint)
+            val lineW = bodyPaint.measureText(line)
+            val x = when (align) {
+                DesignAlign.CENTER -> centerX - (lineW / 2f)
+                DesignAlign.RIGHT -> rightEdge - lineW
+                DesignAlign.LEFT -> leftEdge
+            }
+            canvas.drawText(line, x, yPos, bodyPaint)
             yPos += lineHeight
         }
+        canvas.restore()
 
         // 8. Authenticity Badge Pill (Status)
         if (status.isNotBlank()) {
@@ -1295,6 +1473,9 @@ private fun saveHadithCardBitmapToStorage(
             }
             canvas.drawText(userHandle, width / 2f, height - (95f * scale), handlePaint)
         }
+
+        // 11. زخرفة البطاقة (نفس رسم المعاينة)
+        DesignOrnamentRenderer.draw(canvas, width, height, ornament, "#E8C547")
 
         val fileName = "QABAS_HADITH_${quality}_${System.currentTimeMillis()}.png"
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
