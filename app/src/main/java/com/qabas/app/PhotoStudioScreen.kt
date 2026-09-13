@@ -113,7 +113,7 @@ fun PhotoStudioScreen(
     var previewPxH by remember { mutableIntStateOf(0) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 15)
+        contract = ActivityResultContracts.GetMultipleContents()
     ) { uris ->
         if (uris.isNotEmpty()) {
             selectedImageUris = (selectedImageUris + uris).distinct()
@@ -175,7 +175,7 @@ fun PhotoStudioScreen(
         when (currentStep) {
             1 -> Step1ImageSelection(
                 selectedImageUris = selectedImageUris,
-                onSelectMore = { photoPickerLauncher.launch(ActivityResultContracts.PickVisualMedia.PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                onSelectMore = { photoPickerLauncher.launch("image/*") },
                 onRemoveImage = { uri -> selectedImageUris = selectedImageUris.filter { it != uri } },
                 onNext = {
                     if (selectedImageUris.isNotEmpty()) {
