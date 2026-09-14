@@ -123,6 +123,7 @@ class VideoEngineManager(private val context: Context) {
             if (usableMB < 200L) {
                 onProgress(0f, "مساحة التخزين منخفضة جداً (${usableMB}MB) — يرجى تحرير مساحة")
                 SystemLogsManager.addLog("ERROR", "فشل: مساحة التخزين منخفضة (${usableMB}MB < 200MB)", Color(0xFFEF4444))
+                ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.VIDEO_ENGINE, ProductionPipelineTracker.Result.FAILURE, "نقص مساحة تخزين", "${usableMB}MB متاح (الحد 200MB)", 0)
                 return@withContext null
             } else if (usableMB < 500L) {
                 onProgress(0f, "تنبيه: مساحة التخزين محدودة (${usableMB}MB) — قد تتأثر الجودة")
@@ -354,8 +355,10 @@ class VideoEngineManager(private val context: Context) {
                     "لا يوجد أي مشهد صالح للدمج — فشل التصدير 🔴",
                     Color(0xFFEF4444)
                 )
+                ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.FFmpeg_MERGE, ProductionPipelineTracker.Result.FAILURE, "لا توجد مشاهد صالحة للدمج", "عدد المشاهد المعالجة: ${processedVideoPaths.size}", 0)
                 return@withContext null
             }
+            ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.FFmpeg_MERGE, ProductionPipelineTracker.Result.SUCCESS, "دمج ${validPaths.size} مشاهد", "جهاز: ${if (deviceProfile.isLowEnd) "ضعيف" else "عادي"}", 0)
             var concatSuccess = if (deviceProfile.isLowEnd) {
                 // Stream-copy concat without heavy filter graph re-encoding to save memory
                 VideoProcessor.concatenateVideos(context, validPaths, rawConcatPath)

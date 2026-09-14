@@ -598,7 +598,10 @@ fun IdeaInputSection(
                     if (inspection.verdict == GuardVerdict.REJECTED) {
                         guardInspectionResult = inspection
                         showGuardDialog = true
+                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.CONTENT_GUARD, ProductionPipelineTracker.Result.FAILURE, "رفض المحتوى: ${inspection.verdict}", "السبب: ${inspection.reason}", 0)
                     } else {
+                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.CONTENT_GUARD, ProductionPipelineTracker.Result.SUCCESS, "فحص المحتوى مقبول", "النقطة: ${inspection.score}", 0)
+                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.IDEA_INPUT, ProductionPipelineTracker.Result.SUCCESS, "فكرة جديدة: ${text.take(80)}", "النبرة: ${state.contentTone.ifBlank { "افتراضي" }}", 0)
                         onProceed()
                     }
                 },

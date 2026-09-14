@@ -48,7 +48,12 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 
-enum class DashboardSection { MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS, CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE, AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN, API_KEYS, AUDIT_LOG, BACKUP }
+enum class DashboardSection {
+    MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS,
+    CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE,
+    AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN,
+    API_KEYS, AUDIT_LOG, BACKUP, PRODUCTION_PIPELINE
+}
 
 data class DevUser(
     val id: String,
@@ -164,6 +169,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                             DashboardSection.APP_DOCTOR -> "طبيب التطبيق 🩺"
                             DashboardSection.STYLE_BRAIN -> "عقل الأساليب 🧠"
                             DashboardSection.API_KEYS -> "مفاتيح API 🔑"
+                            DashboardSection.PRODUCTION_PIPELINE -> "مسار الإنتاج 🎬"
                         }, 
                         color = GoldPrimary, 
                         fontWeight = FontWeight.Bold, 
@@ -305,6 +311,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                         onApiKeys = { currentSection = DashboardSection.API_KEYS },
                         onAuditLog = { currentSection = DashboardSection.AUDIT_LOG },
                         onBackup = { currentSection = DashboardSection.BACKUP },
+                        onProductionPipeline = { currentSection = DashboardSection.PRODUCTION_PIPELINE },
                         userCount = devUsers.size
                     )
                 }
@@ -367,6 +374,9 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                 DashboardSection.BACKUP -> {
                     DashboardBackupSection()
                 }
+                DashboardSection.PRODUCTION_PIPELINE -> {
+                    ProductionPipelineSection(context = context)
+                }
             }
         }
     }
@@ -392,6 +402,7 @@ onAppDoctor: () -> Unit,
                         onApiKeys: () -> Unit,
                         onAuditLog: () -> Unit = {},
                         onBackup: () -> Unit = {},
+                        onProductionPipeline: () -> Unit = {},
                         userCount: Int = 0
                     ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -506,7 +517,8 @@ onAppDoctor: () -> Unit,
             Triple("إعدادات حساب المطور", Icons.Default.ManageAccounts, onAccountSettings),
             Triple("مفاتيح API 🔑", Icons.Default.VpnKey, onApiKeys),
             Triple("سجل التدقيق 📋", Icons.Default.History, onAuditLog),
-            Triple("نسخ احتياطي واسترجاع 📦", Icons.Default.Backup, onBackup)
+            Triple("نسخ احتياطي واسترجاع 📦", Icons.Default.Backup, onBackup),
+            Triple("مسار الإنتاج 🎬", Icons.Default.PlayCircle, onProductionPipeline)
         )
 
         LazyVerticalGrid(
