@@ -188,14 +188,14 @@ class MainActivity : ComponentActivity() {
         handleDeepLink(intent)
     }
 
-    private fun handleDeepLink(intent: android.content.Intent?) {
+    private fun handleDeepLink(intent: android.content.Intent) {
         val result = KeyDeepLinkHandler.parseIntent(intent) ?: return
 
         when (result.action) {
             "import" -> {
                 val (success, msg) = KeyDeepLinkHandler.applyImportedKeys(this, result.keys)
                 android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
-                SystemLogsManager.addLog("DEEP_LINK", msg, if (success) 0xFF10B981.toInt() else 0xFFEF4444.toInt())
+                SystemLogsManager.addLog("DEEP_LINK", msg, if (success) androidx.compose.ui.graphics.Color(0xFF10B981) else androidx.compose.ui.graphics.Color(0xFFEF4444))
             }
             "sync" -> {
                 when (result.syncDirection) {

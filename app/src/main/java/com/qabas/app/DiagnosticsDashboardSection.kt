@@ -295,7 +295,7 @@ private fun diagnosticCategory(
     key: String,
     expandedCategory: String?,
     onToggle: (String?) -> Unit,
-    content: @Composable ColumnScope.() -> Unit
+    content: @Composable () -> Unit
 ) {
     val isExpanded = expandedCategory == key
     Card(
@@ -306,7 +306,7 @@ private fun diagnosticCategory(
     ) {
         Column {
             Row(
-                modifier = Modifier.fillMaxWidth().clickable { onToggle(if (isExpanded) null else key).let {} }
+                modifier = Modifier.fillMaxWidth().clickable { onToggle(if (isExpanded) null else key) }
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -320,7 +320,7 @@ private fun diagnosticCategory(
                 Text(title, color = GoldPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = CairoFont, modifier = Modifier.weight(1f))
             }
             if (isExpanded) {
-                Column(modifier = Modifier.padding(horizontal = 14.dp)) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
                     HorizontalDivider(color = Color(0xFF1E293B))
                     Spacer(modifier = Modifier.height(8.dp))
                     content()
