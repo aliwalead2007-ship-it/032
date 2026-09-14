@@ -30,6 +30,11 @@ object MushafPageData {
     @Volatile
     private var juzFirstRefs: List<Pair<Int, Int>>? = null
 
+    @Volatile
+    private var hizbFirstRefs: List<Pair<Int, Int>>? = null
+
+    const val HIZB_COUNT = 60
+
     /**
      * تحميل خريطة الصفحات من assets (مرة واحدة). يُرجع true عند الجاهزية.
      */
@@ -69,6 +74,15 @@ object MushafPageData {
                 if (pages.size == PAGE_COUNT) {
                     pageRefs = pages
                     juzFirstRefs = juzFirst
+                    val hizbArray = root.optJSONArray("hizbFirstVerse")
+                    if (hizbArray != null) {
+                        val hizbFirst = ArrayList<Pair<Int, Int>>(HIZB_COUNT)
+                        for (j in 0 until hizbArray.length()) {
+                            val pair = hizbArray.optJSONArray(j) ?: continue
+                            hizbFirst.add(pair.optInt(0, 1) to pair.optInt(1, 1))
+                        }
+                        hizbFirstRefs = hizbFirst
+                    }
                     Log.i(TAG, "Loaded $PAGE_COUNT madani pages from $path")
                     return true
                 }
@@ -108,6 +122,20 @@ object MushafPageData {
             if (refOrder(juzFirst[j]) <= order) juz = j + 1 else break
         }
         return juz
+    }
+
+    /** رقم الحزب (1-60) الذي تنتمي إليه الصفحة حسب أول آية فيها. -1 عند غياب البيانات. */
+    fun getHizbForPage(page: Int): Int {
+        val hizbFirst = hizbFirstRefs ?: return -1
+        if (hizbFirst.isEmpty()) return -1
+        val refs = getPageRefs(page)
+        if (refs.isEmpty()) return -1
+        val order = refOrder(refs.first())
+        var hizb = 1
+        for (j in hizbFirst.indices) {
+            if (refOrder(hizbFirst[j]) <= order) hizb = j + 1 else break
+        }
+        return hizb
     }
 
     /** أول صفحة تبدأ منها سورة معينة (أول ظهور لآيتها الأولى). -1 عند الغياب. */

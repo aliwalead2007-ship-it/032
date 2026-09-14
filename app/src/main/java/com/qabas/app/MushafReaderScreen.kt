@@ -67,6 +67,7 @@ private fun easternDigits(n: Int): String {
     return n.toString().map { c -> if (c in '0'..'9') eastern[c - '0'] else c }.joinToString("")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MushafReaderScreen(
     onClose: () -> Unit,
@@ -97,7 +98,10 @@ fun MushafReaderScreen(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         if (!dataReady) {
             Box(Modifier.fillMaxSize().background(Color(0xFF0B0F19)), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable(onClick = onPageNumberClick)
+            ) {
                     CircularProgressIndicator(color = GoldPrimary)
                     Spacer(Modifier.height(12.dp))
                     Text("جاري تجهيز صفحات المصحف…", color = TextSecondary, fontFamily = CairoFont)
@@ -145,7 +149,9 @@ private fun MushafReaderContent(
     val currentPage = pagerState.currentPage + 1
     val surahsOnPage = remember(currentPage) { MushafPageData.getSurahsOnPage(currentPage) }
     val juz = remember(currentPage) { MushafPageData.getJuzForPage(currentPage) }
+    val hizb = remember(currentPage) { MushafPageData.getHizbForPage(currentPage) }
     val isBookmarked = currentPage in bookmarks
+    var showSheet by remember { mutableStateOf(false) }
 
     fun toggleBookmark() {
         val updated = if (isBookmarked) bookmarks - currentPage else (bookmarks + currentPage).sorted()
@@ -162,6 +168,7 @@ private fun MushafReaderContent(
             MushafTopBar(
                 surahNames = surahsOnPage.map { QuranDataProvider.surahNameOf(it) },
                 juz = juz,
+                hizb = hizb,
                 onClose = {
                     onSavePage(currentPage)
                     onClose()
@@ -181,13 +188,28 @@ private fun MushafReaderContent(
                 onPrev = { scope.launch { pagerState.animateScrollToPage((currentPage - 2).coerceAtLeast(0)) } },
                 onNext = { scope.launch { pagerState.animateScrollToPage((currentPage).coerceAtMost(MushafPageData.PAGE_COUNT - 1)) } },
                 onToggleBookmark = ::toggleBookmark,
-                onOpenPicker = { showPicker = true }
+                onOpenPicker = { showPicker = true },
+                onPageNumberClick = { showSheet = true }
+            )
+        }
+
+        if (showSheet) {
+            MushafPageSheet(
+                currentPage = currentPage,
+                surahName = surahsOnPage.firstOrNull()?.let { QuranDataProvider.surahNameOf(it) } ?: "المصحف الشريف",
+                hizb = hizb,
+                onGoToPage = { page ->
+                    showSheet = false
+                    scope.launch { pagerState.scrollToPage((page - 1).coerceIn(0, MushafPageData.PAGE_COUNT - 1)) }
+                },
+                onDismiss = { showSheet = false }
             )
         }
 
         if (showPicker) {
             MushafPickerDialog(
                 currentPage = currentPage,
+                lastPage = currentPage,
                 bookmarks = bookmarks,
                 onGoToPage = { page ->
                     showPicker = false
@@ -202,7 +224,7 @@ private fun MushafReaderContent(
 }
 
 @Composable
-private fun MushafTopBar(surahNames: List<String>, juz: Int, onClose: () -> Unit) {
+private fun MushafTopBar(surahNames: List<String>, juz: Int, hizb: Int, onClose: () -> Unit) {
     Surface(color = Color(0xFF0B1120), tonalElevation = 4.dp) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 10.dp),
@@ -217,9 +239,12 @@ private fun MushafTopBar(surahNames: List<String>, juz: Int, onClose: () -> Unit
                     color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 16.sp,
                     textAlign = TextAlign.Center, maxLines = 1
                 )
-                if (juz > 0) {
+                if (juz > 0 || hizb > 0) {
                     Text(
-                        "الجزء ${easternDigits(juz)}",
+                        listOf(
+                            if (juz > 0) "الجزء ${easternDigits(juz)}" else null,
+                            if (hizb > 0) "الحزب ${easternDigits(hizb)}" else null
+                        ).filterNotNull().joinToString(" • "),
                         color = GoldSecondary, fontFamily = CairoFont, fontSize = 12.sp
                     )
                 }
@@ -289,7 +314,8 @@ private fun MushafBottomBar(
     onPrev: () -> Unit,
     onNext: () -> Unit,
     onToggleBookmark: () -> Unit,
-    onOpenPicker: () -> Unit
+    onOpenPicker: () -> Unit,
+    onPageNumberClick: () -> Unit
 ) {
     Surface(color = Color(0xFF0B1120), tonalElevation = 4.dp) {
         Row(
@@ -327,9 +353,83 @@ private fun MushafBottomBar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MushafPageSheet(
+    currentPage: Int,
+    surahName: String,
+    hizb: Int,
+    onGoToPage: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var sliderValue by remember(currentPage) { mutableFloatStateOf(currentPage.toFloat()) }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF151B2B)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    if (hizb > 0) "الحزب ${easternDigits(hizb)}" else "",
+                    color = TextSecondary, fontFamily = CairoFont, fontSize = 13.sp
+                )
+                Text(
+                    surahName,
+                    color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 16.sp
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "صفحة ${easternDigits(currentPage)}",
+                color = GoldPrimary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 30.sp,
+                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth()
+            )
+            Slider(
+                value = sliderValue,
+                onValueChange = { sliderValue = it },
+                onValueChangeFinished = { onGoToPage(sliderValue.toInt().coerceIn(1, MushafPageData.PAGE_COUNT)) },
+                valueRange = 1f..MushafPageData.PAGE_COUNT.toFloat(),
+                steps = MushafPageData.PAGE_COUNT - 2,
+                colors = SliderDefaults.colors(thumbColor = GoldPrimary, activeTrackColor = GoldPrimary)
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                ((currentPage - 3)..(currentPage + 3))
+                    .filter { it in 1..MushafPageData.PAGE_COUNT }
+                    .forEach { p ->
+                        val selected = p == currentPage
+                        Box(
+                            Modifier.clip(RoundedCornerShape(10.dp))
+                                .background(if (selected) GoldPrimary else Color.Transparent)
+                                .border(
+                                    1.dp,
+                                    if (selected) GoldPrimary else Color.White.copy(alpha = 0.15f),
+                                    RoundedCornerShape(10.dp)
+                                )
+                                .clickable { onGoToPage(p) }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                easternDigits(p),
+                                color = if (selected) Color.Black else TextSecondary,
+                                fontFamily = CairoFont,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = if (selected) 18.sp else 14.sp
+                            )
+                        }
+                    }
+            }
+            Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
 @Composable
 private fun MushafPickerDialog(
     currentPage: Int,
+    lastPage: Int,
     bookmarks: List<Int>,
     onGoToPage: (Int) -> Unit,
     onRemoveBookmark: (Int) -> Unit,
@@ -361,24 +461,86 @@ private fun MushafPickerDialog(
                 Box(Modifier.weight(1f, fill = false)) {
                     when (tab) {
                         0 -> {
-                            LazyColumn(Modifier.heightIn(max = 380.dp)) {
-                                items(QuranDataProvider.surahs) { surah ->
-                                    val page = remember { MushafPageData.getPageForSurah(surah.id) }
+                            Column(Modifier.heightIn(max = 420.dp)) {
+                                // بطاقة فاصل الصفحة: آخر موضع قراءة
+                                val lastRefs = remember(lastPage) { MushafPageData.getPageRefs(lastPage) }
+                                if (lastRefs.isNotEmpty()) {
+                                    val (ls, la) = lastRefs.first()
                                     Row(
-                                        Modifier.fillMaxWidth().clickable { if (page > 0) onGoToPage(page) }
-                                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                                        Modifier.fillMaxWidth()
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(Color(0xFF0B1120))
+                                            .border(1.dp, GoldPrimary.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+                                            .clickable { onGoToPage(lastPage) }
+                                            .padding(14.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Text(
-                                            surah.name, color = Color.White, fontFamily = CairoFont,
-                                            fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)
-                                        )
-                                        Text(
-                                            if (page > 0) "ص ${easternDigits(page)}" else "—",
-                                            color = GoldSecondary, fontFamily = CairoFont, fontSize = 12.sp
-                                        )
+                                        Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                "فاصل الصفحة",
+                                                color = Color.White, fontFamily = CairoFont,
+                                                fontWeight = FontWeight.Bold, fontSize = 15.sp
+                                            )
+                                            Text(
+                                                "${QuranDataProvider.surahNameOf(ls)} - الآية ${easternDigits(la)} - صفحة ${easternDigits(lastPage)}",
+                                                color = GoldSecondary, fontFamily = CairoFont, fontSize = 12.sp
+                                            )
+                                        }
+                                        Spacer(Modifier.width(10.dp))
+                                        Text("➤", color = GoldPrimary, fontSize = 20.sp)
                                     }
-                                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                                    Spacer(Modifier.height(10.dp))
+                                }
+                                LazyColumn(Modifier.weight(1f, fill = false)) {
+                                    items(QuranDataProvider.surahs) { surah ->
+                                        val page = remember { MushafPageData.getPageForSurah(surah.id) }
+                                        val selected = surah.id in MushafPageData.getSurahsOnPage(currentPage)
+                                        Row(
+                                            Modifier.fillMaxWidth()
+                                                .clip(RoundedCornerShape(14.dp))
+                                                .background(if (selected) Color(0xFF6B5A1E) else Color.Transparent)
+                                                .clickable { if (page > 0) onGoToPage(page) }
+                                                .padding(vertical = 10.dp, horizontal = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                Modifier.size(44.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(GoldPrimary.copy(alpha = 0.15f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    easternDigits(page.takeIf { it > 0 } ?: 0),
+                                                    color = GoldPrimary, fontFamily = CairoFont,
+                                                    fontWeight = FontWeight.Bold, fontSize = 14.sp
+                                                )
+                                            }
+                                            Spacer(Modifier.width(10.dp))
+                                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                                                Text(
+                                                    surah.name, color = Color.White, fontFamily = CairoFont,
+                                                    fontWeight = FontWeight.Bold, fontSize = 16.sp
+                                                )
+                                                Text(
+                                                    "آياتها ${easternDigits(surah.versesCount)} - ${surah.type}",
+                                                    color = TextSecondary, fontFamily = CairoFont, fontSize = 12.sp
+                                                )
+                                            }
+                                            Spacer(Modifier.width(10.dp))
+                                            Box(
+                                                Modifier.size(44.dp)
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(GoldPrimary.copy(alpha = 0.15f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    easternDigits(surah.id),
+                                                    color = GoldPrimary, fontFamily = CairoFont,
+                                                    fontWeight = FontWeight.Bold, fontSize = 15.sp
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
