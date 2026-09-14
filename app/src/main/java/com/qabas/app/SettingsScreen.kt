@@ -520,6 +520,7 @@ fun SettingsScreen(
                         }
                     }
                 }
+            }
 
             // 4. Official Accounts Collapsible Section (الحسابات الرسمية)
             val officialChannels = remember { SocialAccountManager.getOfficialChannels(context) }

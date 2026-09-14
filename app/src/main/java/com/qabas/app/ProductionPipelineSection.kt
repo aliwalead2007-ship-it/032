@@ -24,9 +24,9 @@ import com.qabas.app.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductionPipelineSection(
-    context: LocalContext = LocalContext.current,
     onBack: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val events = remember { mutableStateOf(ProductionPipelineTracker.getEvents(context)) }
     val stats = remember { ProductionPipelineTracker.getStageStats(context) }
     var selectedStage by remember { mutableStateOf<ProductionPipelineTracker.Stage?>(null) }

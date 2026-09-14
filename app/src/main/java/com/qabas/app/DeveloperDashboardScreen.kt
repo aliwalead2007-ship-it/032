@@ -377,10 +377,10 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                     DashboardBackupSection()
                 }
                 DashboardSection.PRODUCTION_PIPELINE -> {
-                    ProductionPipelineSection(context = context)
+                    ProductionPipelineSection()
                 }
                 DashboardSection.DIAGNOSTICS -> {
-                    DiagnosticsDashboardSection(context = context)
+                    DiagnosticsDashboardSection()
                 }
             }
         }

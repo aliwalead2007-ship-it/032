@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -88,6 +89,7 @@ fun ProcessingScreen(
     val elapsedJobRef = remember { mutableStateOf<Job?>(null) }
 
     var showCancelDialog by remember { mutableStateOf(false) }
+    var finalScenes by remember { mutableStateOf<List<Scene>>(emptyList()) }
 
     val doCancel = remember(onCancel) {
         {
@@ -256,6 +258,7 @@ fun ProcessingScreen(
                 )
             }
 
+            finalScenes = scenes
             totalScenes = scenes.size
             pushActivity("تم اعتماد ${scenes.size} مشاهد")
             currentStage = "scenes"
@@ -510,7 +513,7 @@ fun ProcessingScreen(
         showCancelDialog = showCancelDialog,
         isFailed = isFailed,
         isComplete = progress >= 1f && !isFailed,
-        onViewVideo = { onProcessingComplete(scenes) },
+        onViewVideo = { onProcessingComplete(finalScenes) },
         onRequestCancel = { showCancelDialog = true },
         onDismissCancel = { showCancelDialog = false },
         onConfirmCancel = {
@@ -698,7 +701,7 @@ private fun ProcessingScreenUI(
                             colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Icon(Icons.Default.Visibility, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Send, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 Translator.tr("عرض الفيديو ومشاركته"),

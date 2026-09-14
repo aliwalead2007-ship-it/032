@@ -28,9 +28,9 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsDashboardSection(
-    context: LocalContext = LocalContext.current,
     onBack: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var report by remember { mutableStateOf<AppDiagnostics.DiagnosticReport?>(null) }
     var isLoading by remember { mutableStateOf(true) }

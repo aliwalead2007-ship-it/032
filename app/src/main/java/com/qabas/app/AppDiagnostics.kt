@@ -334,7 +334,7 @@ object AppDiagnostics {
                 isConfigured = isConfigured,
                 lastLatencyMs = apiStat?.lastLatencyMs ?: 0,
                 successRate = apiStat?.successRate ?: 0f,
-                totalCalls = apiStat?.totalCalls ?: 0,
+                totalCalls = (apiStat?.totalCalls ?: 0L).toInt(),
                 status = status
             )
         }

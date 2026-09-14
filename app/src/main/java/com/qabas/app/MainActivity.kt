@@ -182,6 +182,39 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: android.content.Intent?) {
+        val result = KeyDeepLinkHandler.parseIntent(intent) ?: return
+
+        when (result.action) {
+            "import" -> {
+                val (success, msg) = KeyDeepLinkHandler.applyImportedKeys(this, result.keys)
+                android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
+                SystemLogsManager.addLog("DEEP_LINK", msg, if (success) 0xFF10B981.toInt() else 0xFFEF4444.toInt())
+            }
+            "sync" -> {
+                when (result.syncDirection) {
+                    "push" -> KeySyncService.pushToCloud(this) { _, msg ->
+                        runOnUiThread { android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show() }
+                    }
+                    "pull" -> KeySyncService.pullFromCloud(this) { _, msg ->
+                        runOnUiThread { android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show() }
+                    }
+                    else -> KeySyncService.syncBidirectional(this) { _, msg ->
+                        runOnUiThread { android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show() }
+                    }
+                }
+            }
+            "validate" -> {
+                android.widget.Toast.makeText(this, "جاري التحقق من جميع المفاتيح...", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 }
 
 @Composable
@@ -634,37 +667,4 @@ fun buildCinematicPrompt(
         User Concept/Script:
         $userIdea
     """.trimIndent()
-}
-
-private fun MainActivity.handleDeepLink(intent: android.content.Intent?) {
-    val result = KeyDeepLinkHandler.parseIntent(intent) ?: return
-
-    when (result.action) {
-        "import" -> {
-            val (success, msg) = KeyDeepLinkHandler.applyImportedKeys(this, result.keys)
-            android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
-            SystemLogsManager.addLog("DEEP_LINK", msg, if (success) android.graphics.Color(0xFF10B981) else android.graphics.Color(0xFFEF4444))
-        }
-        "sync" -> {
-            when (result.syncDirection) {
-                "push" -> KeySyncService.pushToCloud(this) { ok, msg ->
-                    runOnUiThread { android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show() }
-                }
-                "pull" -> KeySyncService.pullFromCloud(this) { ok, msg ->
-                    runOnUiThread { android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show() }
-                }
-                else -> KeySyncService.syncBidirectional(this) { ok, msg ->
-                    runOnUiThread { android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show() }
-                }
-            }
-        }
-        "validate" -> {
-            android.widget.Toast.makeText(this, "جاري التحقق من جميع المفاتيح...", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
-}
-
-override fun onNewIntent(intent: android.content.Intent) {
-    super.onNewIntent(intent)
-    handleDeepLink(intent)
 }
