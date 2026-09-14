@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -307,6 +308,79 @@ fun ApiKeysScreen(onBack: () -> Unit) {
     var showSmartPasteDialog by remember { mutableStateOf(false) }
     var smartPasteText by remember { mutableStateOf("") }
     var showExportOptionsDialog by remember { mutableStateOf(false) }
+    var lastGlobalClipboard by remember { mutableStateOf("") }
+    var autoCaptureMessage by remember { mutableStateOf<String?>(null) }
+
+    // ── Auto-detect & distribute keys from clipboard ──
+    fun autoDetectAndDistribute(clipboardText: String) {
+        if (clipboardText.isBlank() || clipboardText == lastGlobalClipboard) return
+        lastGlobalClipboard = clipboardText
+        val detected = detectKeysForAutoFill(clipboardText)
+        if (detected.isEmpty()) return
+
+        val saved = mutableListOf<String>()
+        detected.forEach { (service, key) ->
+            when (service) {
+                "gemini" -> { geminiKey = key; saved.add("Gemini") }
+                "groq" -> { groqKey = key; saved.add("Groq") }
+                "openai" -> { openaiKey = key; saved.add("OpenAI") }
+                "huggingface" -> { huggingfaceKey = key; saved.add("HuggingFace") }
+                "azure" -> { azureSpeechKey = key; saved.add("Azure TTS") }
+                "elevenlabs" -> { elevenLabsKey = key; saved.add("ElevenLabs") }
+                "pexels" -> { pexelsKey = key; saved.add("Pexels") }
+                "pixabay" -> { pixabayKey = key; saved.add("Pixabay") }
+            }
+        }
+        if (saved.isNotEmpty()) {
+            // Auto-save to prefs immediately
+            prefs.edit().apply {
+                detected["gemini"]?.let { putString("gemini_key", it) }
+                detected["groq"]?.let { putString("groq_key", it) }
+                detected["openai"]?.let { putString("openai_key", it) }
+                detected["huggingface"]?.let { putString("huggingface_key", it) }
+                detected["azure"]?.let { putString("azure_speech_key", it) }
+                detected["elevenlabs"]?.let { putString("elevenlabs_key", it) }
+                detected["pexels"]?.let { putString("pexels_key", it) }
+                detected["pixabay"]?.let { putString("pixabay_key", it) }
+            }.apply()
+            autoCaptureMessage = "تم التقاط ${saved.size} مفتاح تلقائياً: ${saved.joinToString("، ")} ✅"
+            SystemLogsManager.addLog("AUTO_CAPTURE", "التقاط تلقائي: ${saved.joinToString(", ")}", Color(0xFF10B981))
+        }
+    }
+
+    // ── Clipboard change listener (real-time auto-capture) ──
+    val androidClipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+    DisposableEffect(Unit) {
+        val listener = android.content.ClipboardManager.OnPrimaryClipChangedListener {
+            val text = androidClipboard?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+            autoDetectAndDistribute(text)
+        }
+        androidClipboard?.addPrimaryClipChangedListener(listener)
+        onDispose {
+            androidClipboard?.removePrimaryClipChangedListener(listener)
+        }
+    }
+
+    // ── Check clipboard on screen resume ──
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                val text = androidClipboard?.primaryClip?.getItemAt(0)?.text?.toString().orEmpty()
+                autoDetectAndDistribute(text)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Auto-dismiss capture message
+    LaunchedEffect(autoCaptureMessage) {
+        if (autoCaptureMessage != null) {
+            kotlinx.coroutines.delay(5000)
+            autoCaptureMessage = null
+        }
+    }
 
     fun syncUiWithPrefs(imported: Map<String, String>) {
         imported["gemini_key"]?.let { geminiKey = it }
@@ -434,6 +508,37 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Auto-capture notification banner
+                if (autoCaptureMessage != null) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF10B981).copy(alpha = 0.15f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF10B981).copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    autoCaptureMessage ?: "",
+                                    color = Color(0xFF10B981),
+                                    fontFamily = CairoFont,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(onClick = { autoCaptureMessage = null }, modifier = Modifier.size(20.dp)) {
+                                    Icon(Icons.Default.Close, contentDescription = "إغلاق", tint = Color(0xFF10B981), modifier = Modifier.size(14.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
                 item {
                     // مجاني تماماً: بطاقة توضح أن التطبيق يعمل بلا أي مفتاح
                     Card(
