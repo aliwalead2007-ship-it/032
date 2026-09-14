@@ -102,10 +102,7 @@ fun MushafReaderScreen(
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         if (!dataReady) {
             Box(Modifier.fillMaxSize().background(Color(0xFF0B0F19)), contentAlignment = Alignment.Center) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.clickable(onClick = onPageNumberClick)
-            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = GoldPrimary)
                     Spacer(Modifier.height(12.dp))
                     Text("جاري تجهيز صفحات المصحف…", color = TextSecondary, fontFamily = CairoFont)
@@ -452,7 +449,10 @@ private fun MushafBottomBar(
                     tint = if (isBookmarked) GoldPrimary else Color.Gray
                 )
             }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable(onClick = onPageNumberClick)
+            ) {
                 Text(
                     "صفحة ${easternDigits(page)}",
                     color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 15.sp
@@ -733,7 +733,7 @@ private fun MushafPickerDialog(
                                     value = input,
                                     onValueChange = { v -> if (v.all { it.isDigit() } && v.length <= 3) input = v },
                                     label = { Text("رقم الصفحة (١–٦٠٤)", fontFamily = CairoFont) },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPad),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     singleLine = true, modifier = Modifier.fillMaxWidth()
                                 )
                                 Spacer(Modifier.height(12.dp))
