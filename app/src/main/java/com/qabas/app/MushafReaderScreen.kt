@@ -105,28 +105,52 @@ fun MushafReaderScreen(
                     TextButton(onClick = onClose) { Text("رجوع", color = GoldPrimary, fontFamily = CairoFont) }
                 }
             }
-            return@CompositionLocalProvider
+        } else {
+            MushafReaderContent(
+                startPage = (initialPage ?: prefs.getInt(KEY_LAST_PAGE, 1)).coerceIn(1, MushafPageData.PAGE_COUNT),
+                bookmarks = bookmarks,
+                onBookmarksChange = { updated ->
+                    bookmarks = updated
+                    prefs.edit().putStringSet(KEY_BOOKMARKS, updated.map { it.toString() }.toSet()).apply()
+                },
+                onSavePage = { page -> prefs.edit().putInt(KEY_LAST_PAGE, page).apply() },
+                onClose = {
+                    onClose()
+                },
+                onOpenTafseer = onOpenTafseer
+            )
         }
+    }
+}
 
-        val startPage = (initialPage ?: prefs.getInt(KEY_LAST_PAGE, 1)).coerceIn(1, MushafPageData.PAGE_COUNT)
-        val pagerState = rememberPagerState(initialPage = startPage - 1, pageCount = { MushafPageData.PAGE_COUNT })
-        var showPicker by remember { mutableStateOf(false) }
+@Composable
+private fun MushafReaderContent(
+    startPage: Int,
+    bookmarks: List<Int>,
+    onBookmarksChange: (List<Int>) -> Unit,
+    onSavePage: (Int) -> Unit,
+    onClose: () -> Unit,
+    onOpenTafseer: (Int, Int) -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(initialPage = startPage - 1, pageCount = { MushafPageData.PAGE_COUNT })
+    var showPicker by remember { mutableStateOf(false) }
 
-        // حفظ آخر صفحة عند كل تنقل — بلا كتابة مفرطة (عند الاستقرار فقط عبر currentPage)
-        LaunchedEffect(pagerState.currentPage) {
-            prefs.edit().putInt(KEY_LAST_PAGE, pagerState.currentPage + 1).apply()
-        }
+    // حفظ آخر صفحة عند كل تنقل
+    LaunchedEffect(pagerState.currentPage) {
+        onSavePage(pagerState.currentPage + 1)
+    }
 
-        val currentPage = pagerState.currentPage + 1
-        val surahsOnPage = remember(currentPage) { MushafPageData.getSurahsOnPage(currentPage) }
-        val juz = remember(currentPage) { MushafPageData.getJuzForPage(currentPage) }
-        val isBookmarked = currentPage in bookmarks
+    val currentPage = pagerState.currentPage + 1
+    val surahsOnPage = remember(currentPage) { MushafPageData.getSurahsOnPage(currentPage) }
+    val juz = remember(currentPage) { MushafPageData.getJuzForPage(currentPage) }
+    val isBookmarked = currentPage in bookmarks
 
-        fun toggleBookmark() {
-            val updated = if (isBookmarked) bookmarks - currentPage else (bookmarks + currentPage).sorted()
-            bookmarks = updated
-            prefs.edit().putStringSet(KEY_BOOKMARKS, updated.map { it.toString() }.toSet()).apply()
-            Toast.makeText(
+    fun toggleBookmark() {
+        val updated = if (isBookmarked) bookmarks - currentPage else (bookmarks + currentPage).sorted()
+        onBookmarksChange(updated)
+        Toast.makeText(
                 context,
                 if (isBookmarked) "أُزيلت العلامة من صفحة $currentPage 🔖" else "حُفظت صفحة $currentPage في علاماتك 🔖",
                 Toast.LENGTH_SHORT
@@ -139,7 +163,7 @@ fun MushafReaderScreen(
                 surahNames = surahsOnPage.map { QuranDataProvider.surahNameOf(it) },
                 juz = juz,
                 onClose = {
-                    prefs.edit().putInt(KEY_LAST_PAGE, currentPage).apply()
+                    onSavePage(currentPage)
                     onClose()
                 }
             )
@@ -170,14 +194,11 @@ fun MushafReaderScreen(
                     scope.launch { pagerState.scrollToPage((page - 1).coerceIn(0, MushafPageData.PAGE_COUNT - 1)) }
                 },
                 onRemoveBookmark = { page ->
-                    val updated = bookmarks - page
-                    bookmarks = updated
-                    prefs.edit().putStringSet(KEY_BOOKMARKS, updated.map { it.toString() }.toSet()).apply()
+                    onBookmarksChange(bookmarks - page)
                 },
                 onDismiss = { showPicker = false }
             )
         }
-    }
 }
 
 @Composable
