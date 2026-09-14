@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -150,10 +151,18 @@ private fun MushafReaderContent(
     val scope = rememberCoroutineScope()
     val pagerState = rememberPagerState(initialPage = startPage - 1, pageCount = { MushafPageData.PAGE_COUNT })
     var showPicker by remember { mutableStateOf(false) }
+    // حالة التلاوة: 0 خامد / 1 تحميل / 2 يعمل / 3 متوقف مؤقتاً
+    var audioState by remember { mutableIntStateOf(0) }
 
-    // حفظ آخر صفحة عند كل تنقل
+    fun stopAudio() {
+        QuranAudioPlayer.stop()
+        audioState = 0
+    }
+
+    // حفظ آخر صفحة عند كل تنقل + إيقاف التلاوة عند تغيير الصفحة
     LaunchedEffect(pagerState.currentPage) {
         onSavePage(pagerState.currentPage + 1)
+        stopAudio()
     }
 
     val currentPage = pagerState.currentPage + 1
@@ -184,6 +193,7 @@ private fun MushafReaderContent(
                 juz = juz,
                 hizb = hizb,
                 onClose = {
+                    stopAudio()
                     onSavePage(currentPage)
                     onClose()
                 }
@@ -220,10 +230,39 @@ private fun MushafReaderContent(
                 surahName = surahsOnPage.firstOrNull()?.let { QuranDataProvider.surahNameOf(it) } ?: "المصحف الشريف",
                 hizb = hizb,
                 visibleAyah = visibleAyah,
+                audioState = audioState,
                 fontScale = fontScale,
                 onFontScaleChange = onFontScaleChange,
                 onAudioClick = {
-                    Toast.makeText(context, "التلاوة الصوتية عبر الإنترنت قيد التجهيز — اختر قارئك من قسم «القراء والروايات»", Toast.LENGTH_SHORT).show()
+                    when (audioState) {
+                        2 -> {
+                            QuranAudioPlayer.toggle()
+                            audioState = 3
+                        }
+                        3 -> {
+                            QuranAudioPlayer.toggle()
+                            audioState = 2
+                        }
+                        else -> {
+                            if (!QuranAudioService.isConfigured()) {
+                                Toast.makeText(context, "أضف مفتاحي Quran Foundation في ملف .env لتفعيل التلاوة 🎧", Toast.LENGTH_LONG).show()
+                            } else {
+                                audioState = 1
+                                scope.launch(Dispatchers.IO) {
+                                    val urls = QuranAudioService.getPageAudioUrls(context, currentPage)
+                                    withContext(Dispatchers.Main) {
+                                        if (urls.isEmpty()) {
+                                            audioState = 0
+                                            Toast.makeText(context, "تعذر جلب تلاوة الصفحة — تحقق من الشبكة والمفاتيح", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            QuranAudioPlayer.playUrls(context, urls)
+                                            audioState = 2
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 onGoToPage = { page ->
                     showSheet = false
@@ -440,6 +479,7 @@ private fun MushafPageSheet(
     surahName: String,
     hizb: Int,
     visibleAyah: Int,
+    audioState: Int,
     fontScale: Float,
     onFontScaleChange: (Float) -> Unit,
     onAudioClick: () -> Unit,
@@ -519,8 +559,16 @@ private fun MushafPageSheet(
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onAudioClick) {
-                    Icon(Icons.Default.Headset, contentDescription = "التلاوة الصوتية", tint = GoldPrimary)
+                IconButton(onClick = onAudioClick, enabled = audioState != 1) {
+                    when (audioState) {
+                        1 -> CircularProgressIndicator(
+                            color = GoldPrimary,
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                        2 -> Icon(Icons.Default.Pause, contentDescription = "إيقاف مؤقت", tint = GoldPrimary)
+                        else -> Icon(Icons.Default.Headset, contentDescription = "التلاوة الصوتية", tint = GoldPrimary)
+                    }
                 }
                 Text("أ", color = TextSecondary, fontFamily = CairoFont, fontSize = 14.sp)
                 Slider(
