@@ -176,7 +176,7 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Device Info ──
-                diagnosticCategory("معلومات الجهاز 📱", "device", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("معلومات الجهاز 📱", "device", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("الموديل", "${r.deviceInfo.manufacturer} ${r.deviceInfo.model}")
                     DiagnosticRow("أندرويد", "${r.deviceInfo.androidVersion} (SDK ${r.deviceInfo.sdkInt})")
                     DiagnosticRow("التطبيق", "v${r.deviceInfo.appVersion} (${r.deviceInfo.appVersionCode})")
@@ -185,7 +185,7 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Memory ──
-                diagnosticCategory("الذاكرة 💾", "memory", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("الذاكرة 💾", "memory", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRowWithBar("استخدام Heap", "${r.memoryInfo.usedHeapMB}/${r.memoryInfo.totalHeapMB}MB", r.memoryInfo.heapUsagePercent)
                     DiagnosticRow("ذاكرة متاحة", "${r.memoryInfo.availableRAM_MB}MB من ${r.memoryInfo.totalRAM_MB}MB")
                     DiagnosticRow("الذاكرة الأصلية", "${r.memoryInfo.nativeHeapMB}MB")
@@ -193,7 +193,7 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Storage ──
-                diagnosticCategory("التخزين 💿", "storage", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("التخزين 💿", "storage", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("مساحة داخلية متاحة", "${r.storageInfo.internalAvailableMB}MB من ${r.storageInfo.internalTotalMB}MB")
                     DiagnosticRow("حجم الكاش", "${r.storageInfo.cacheDirMB}MB")
                     DiagnosticRow("حجم ملفات التطبيق", "${r.storageInfo.filesDirMB}MB")
@@ -202,14 +202,14 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Network ──
-                diagnosticCategory("الشبكة 🌐", "network", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("الشبكة 🌐", "network", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("حالة الاتصال", if (r.networkInfo.isConnected) "متصل ✅" else "غير متصل ❌")
                     DiagnosticRow("نوع الاتصال", r.networkInfo.connectionType)
                     DiagnosticRow("بيانات مقيدة", if (r.networkInfo.isMetered) "نعم ⚠️" else "لا ✅")
                 }
 
                 // ── Battery ──
-                diagnosticCategory("البطارية 🔋", "battery", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("البطارية 🔋", "battery", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("مستوى البطارية", "${r.batteryInfo.level}%")
                     DiagnosticRow("الشحن", if (r.batteryInfo.isCharging) "يشحن ⚡" else "غير متصل")
                     DiagnosticRow("الحرارة", "${r.batteryInfo.temperature}°C")
@@ -217,7 +217,7 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── API Health ──
-                diagnosticCategory("صحة APIs 🔑", "api", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("صحة APIs 🔑", "api", expandedCategory, { expandedCategory = it }) {
                     r.apiHealth.forEach { api ->
                         val statusIcon = when (api.status) {
                             AppDiagnostics.ApiHealth.Status.OK -> "✅"
@@ -233,7 +233,7 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Prefs Health ──
-                diagnosticCategory("صحة التفضيلات 📋", "prefs", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("صحة التفضيلات 📋", "prefs", expandedCategory, { expandedCategory = it }) {
                     r.prefsHealth.forEach { pref ->
                         DiagnosticRow(
                             if (pref.isHealthy) "✅ ${pref.name}" else "⚠️ ${pref.name}",
@@ -243,7 +243,7 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Database ──
-                diagnosticCategory("قاعدة البيانات 🗄️", "database", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("قاعدة البيانات 🗄️", "database", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("حجم قاعدة البيانات", "${r.dbHealth.totalSizeMB}MB")
                     r.dbHealth.tables.forEach { table ->
                         DiagnosticRow("  ${table.name}", "${table.rowCount} صف")
@@ -251,14 +251,14 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Crashes ──
-                diagnosticCategory("الانهيارات 🛡️", "crashes", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("الانهيارات 🛡️", "crashes", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("إجمالي ملفات الانهيار", "${r.crashHealth.totalCrashFiles}")
                     DiagnosticRow("آخر انهيار", r.crashHealth.lastCrashAge)
                     DiagnosticRow("انهيارات آخر 24 ساعة", "${r.crashHealth.crashCount24h}")
                 }
 
                 // ── Threads ──
-                diagnosticCategory("الخيوط 🧵", "threads", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("الخيوط 🧵", "threads", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("عدد الخيوط النشطة", "${r.threadInfo.activeThreads}")
                     r.threadInfo.threadNames.take(10).forEach { name ->
                         DiagnosticRow("  ", name)
@@ -269,14 +269,16 @@ fun DiagnosticsDashboardSection(
                 }
 
                 // ── Pipeline ──
-                diagnosticCategory("مسار الإنتاج 🎬", "pipeline", expandedCategory) { expandedCategory = it } {
+                diagnosticCategory("مسار الإنتاج 🎬", "pipeline", expandedCategory, { expandedCategory = it }) {
                     DiagnosticRow("إجمالي الأحداث", "${r.pipelineHealth.totalEvents}")
                     DiagnosticRow("معدل النجاح", "${(r.pipelineHealth.recentSuccessRate * 100).toInt()}%")
                     if (r.pipelineHealth.lastFailure.isNotBlank()) {
                         DiagnosticRow("آخر فشل", r.pipelineHealth.lastFailure)
                     }
                     if (r.pipelineHealth.avgProductionTimeMs > 0) {
-                        DiagnosticRow("متوسط وقت الإنتاج", ProductionPipelineTracker.formatDuration(r.pipelineHealth.avgProductionTimeMs))
+                        val mins = r.pipelineHealth.avgProductionTimeMs / 60000
+                        val secs = (r.pipelineHealth.avgProductionTimeMs % 60000) / 1000
+                        DiagnosticRow("متوسط وقت الإنتاج", "${mins}د ${secs}ث")
                     }
                 }
 

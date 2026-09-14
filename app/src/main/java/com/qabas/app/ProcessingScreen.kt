@@ -509,6 +509,8 @@ fun ProcessingScreen(
         activityLog = activityLog,
         showCancelDialog = showCancelDialog,
         isFailed = isFailed,
+        isComplete = progress >= 1f && !isFailed,
+        onViewVideo = { onProcessingComplete(scenes) },
         onRequestCancel = { showCancelDialog = true },
         onDismissCancel = { showCancelDialog = false },
         onConfirmCancel = {
@@ -531,6 +533,8 @@ private fun ProcessingScreenUI(
     activityLog: List<String>,
     showCancelDialog: Boolean,
     isFailed: Boolean,
+    isComplete: Boolean = false,
+    onViewVideo: () -> Unit = {},
     onRequestCancel: () -> Unit,
     onDismissCancel: () -> Unit,
     onConfirmCancel: () -> Unit
@@ -688,12 +692,13 @@ private fun ProcessingScreenUI(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Button(
-                            onClick = { if (isActive) onProcessingComplete(processedScenes) },
+                            onClick = { if (isComplete) onViewVideo() },
+                            enabled = isComplete,
                             modifier = Modifier.fillMaxWidth().height(52.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
                             shape = RoundedCornerShape(14.dp)
                         ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.Visibility, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 Translator.tr("عرض الفيديو ومشاركته"),

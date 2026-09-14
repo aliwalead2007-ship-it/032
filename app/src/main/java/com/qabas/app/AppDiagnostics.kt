@@ -2,6 +2,8 @@ package com.qabas.app
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.database.sqlite.SQLiteDatabase
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -272,7 +274,11 @@ object AppDiagnostics {
         val batteryManager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
         val level = batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: -1
         val isCharging = batteryManager?.isCharging ?: false
-        val temperature = (batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_TEMPERATURE) ?: 0) / 10f
+
+        // Get temperature from battery intent (BATTERY_PROPERTY_TEMPERATURE not available on all APIs)
+        val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val temperatureRaw = batteryIntent?.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) ?: 0
+        val temperature = temperatureRaw / 10f
 
         val health = when (batteryManager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_STATUS)) {
             BatteryManager.BATTERY_STATUS_CHARGING -> "يشحن"
@@ -293,7 +299,7 @@ object AppDiagnostics {
 
     private fun collectApiHealth(context: Context, issues: MutableList<Issue>): List<ApiHealth> {
         val prefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
-        val stats = ApiUsageTracker.snapshot()
+        val stats = runCatching { kotlinx.coroutines.runBlocking { ApiUsageTracker.snapshot(context) } }.getOrDefault(emptyMap())
 
         val services = listOf(
             Triple("Gemini", "gemini_key", "AIzaSy"),
@@ -309,7 +315,8 @@ object AppDiagnostics {
         return services.map { (name, key, prefix) ->
             val keyVal = prefs.getString(key, "") ?: ""
             val isConfigured = keyVal.isNotBlank() && !keyVal.startsWith("your_") && keyVal != "YOUR_KEY"
-            val apiStat = stats.firstOrNull { it.serviceName.contains(name, ignoreCase = true) }
+            val apiEntry = stats.entries.find { it.key.contains(name, ignoreCase = true) }
+            val apiStat = apiEntry?.value
 
             val status = when {
                 !isConfigured -> ApiHealth.Status.UNKNOWN
@@ -417,7 +424,7 @@ object AppDiagnostics {
         if (recentCrashes > 3) {
             issues.add(Issue(Issue.Severity.CRITICAL, "الانهيارات", "انهيارات متكررة", "$recentCrashes انهيارات في آخر 24 ساعة", "راجع سجل الانهيارات في لوحة المطور"))
         } else if (recentCrashes > 0) {
-            issues.add(Issue(Issue.Severity.WARNING, "الانهيارات", "انهيارات حديثة", "$recentCrashAge", "تحقق من سجل الانهيارات"))
+            issues.add(Issue(Issue.Severity.WARNING, "الانهيارات", "انهيارات حديثة", "$lastCrashAge", "تحقق من سجل الانهيارات"))
         }
 
         return CrashHealth(crashFiles.size, lastCrashTime, lastCrashAge, recentCrashes)
