@@ -844,6 +844,220 @@ fun ApiKeysScreen(onBack: () -> Unit) {
                     }
                 }
 
+                // ─── Cloud Sync Panel ───
+                item {
+                    var syncState by remember { mutableStateOf(0) } // 0=idle, 1=pushing, 2=pulling, 3=syncing
+                    var syncMessage by remember { mutableStateOf<String?>(null) }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF8B5CF6).copy(alpha = 0.06f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(color = Color(0xFF8B5CF6).copy(alpha = 0.15f), shape = CircleShape, modifier = Modifier.size(38.dp)) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.CloudSync, contentDescription = null, tint = Color(0xFF8B5CF6), modifier = Modifier.size(19.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("المزامنة السحابية ☁️", color = DeepSlate, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("اختر جهازاً آخر ومزّن المفاتيح بينهما", color = TextSecondary, fontFamily = CairoFont, fontSize = 11.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            if (syncMessage != null) {
+                                Card(colors = CardDefaults.cardColors(containerColor = if (syncState == 0) Color(0xFFEF4444).copy(alpha = 0.08f) else Color(0xFF10B981).copy(alpha = 0.08f)), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+                                    Text(syncMessage!!, modifier = Modifier.padding(10.dp), color = if (syncState == 0) Color(0xFFEF4444) else Color(0xFF10B981), fontFamily = CairoFont, fontSize = 12.sp)
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        syncState = 1; syncMessage = null
+                                        KeySyncService.pushToCloud(context) { ok, msg ->
+                                            syncMessage = msg; syncState = 0
+                                        }
+                                    },
+                                    enabled = syncState == 0 && SupabaseConfig.isConfigured,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF8B5CF6)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    if (syncState == 1) CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                                    else { Icon(Icons.Default.CloudUpload, contentDescription = null, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)) }
+                                    Text("رفع ☁️", color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+                                Button(
+                                    onClick = {
+                                        syncState = 2; syncMessage = null
+                                        KeySyncService.pullFromCloud(context) { ok, msg ->
+                                            syncMessage = msg; syncState = 0
+                                        }
+                                    },
+                                    enabled = syncState == 0 && SupabaseConfig.isConfigured,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22D3EE)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    if (syncState == 2) CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                                    else { Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)) }
+                                    Text("سحب 📥", color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+                                Button(
+                                    onClick = {
+                                        syncState = 3; syncMessage = null
+                                        KeySyncService.syncBidirectional(context) { ok, msg ->
+                                            syncMessage = msg; syncState = 0
+                                        }
+                                    },
+                                    enabled = syncState == 0 && SupabaseConfig.isConfigured,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    if (syncState == 3) CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                                    else { Icon(Icons.Default.SyncAlt, contentDescription = null, modifier = Modifier.size(14.dp)); Spacer(Modifier.width(4.dp)) }
+                                    Text("مزامنة 🔄", color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+                            }
+
+                            if (!SupabaseConfig.isConfigured) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("⚠️ Supabase غير مُعد — أضف SUPABASE_URL و SUPABASE_ANON_KEY في .env", color = Color(0xFFF59E0B), fontFamily = CairoFont, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+
+                // ─── Deep Link Share Panel ───
+                item {
+                    var showShareDialog by remember { mutableStateOf(false) }
+                    var shareLink by remember { mutableStateOf("") }
+                    var linkImportMessage by remember { mutableStateOf<String?>(null) }
+
+                    if (showShareDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showShareDialog = false },
+                            title = { Text("مشاركة المفاتيح 🔗", fontFamily = CairoFont, fontWeight = FontWeight.Bold, color = DeepSlate) },
+                            text = {
+                                Column {
+                                    Text("شارك هذا الرابط مع جهاز آخر:", fontFamily = CairoFont, fontSize = 12.sp, color = TextSecondary)
+                                    Spacer(Modifier.height(8.dp))
+                                    Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF141C27)), shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                        Text(shareLink, modifier = Modifier.padding(10.dp), color = Color(0xFF22D3EE), fontFamily = CairoFont, fontSize = 10.sp, lineHeight = 14.sp)
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("⚠️ الرابط يحتوي مفاتيح خاصة — لا تشاركه مع غير موثوقين", color = Color(0xFFF59E0B), fontFamily = CairoFont, fontSize = 10.sp)
+                                    Spacer(Modifier.height(10.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedButton(onClick = {
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                            clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("keys", shareLink))
+                                            linkImportMessage = "تم النسخ ✅"
+                                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch { kotlinx.coroutines.delay(2000); linkImportMessage = null }
+                                        }, shape = RoundedCornerShape(8.dp)) {
+                                            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("نسخ 📋", fontFamily = CairoFont, fontSize = 11.sp)
+                                        }
+                                        OutlinedButton(onClick = {
+                                            val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                                putExtra(Intent.EXTRA_TEXT, shareLink)
+                                                type = "text/plain"
+                                            }
+                                            context.startActivity(Intent.createChooser(sendIntent, "مشاركة مفاتيح قبس"))
+                                        }, shape = RoundedCornerShape(8.dp)) {
+                                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
+                                            Spacer(Modifier.width(4.dp))
+                                            Text("إرسال 📤", fontFamily = CairoFont, fontSize = 11.sp)
+                                        }
+                                    }
+                                    linkImportMessage?.let {
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(it, color = Color(0xFF10B981), fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    }
+                                }
+                            },
+                            confirmButton = {},
+                            dismissButton = {
+                                TextButton(onClick = { showShareDialog = false }) { Text("إغلاق", fontFamily = CairoFont, color = TextSecondary) }
+                            }
+                        )
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF22D3EE).copy(alpha = 0.06f)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF22D3EE).copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Surface(color = Color(0xFF22D3EE).copy(alpha = 0.15f), shape = CircleShape, modifier = Modifier.size(38.dp)) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Link, contentDescription = null, tint = Color(0xFF22D3EE), modifier = Modifier.size(19.dp))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("مشاركة عبر رابط 🔗", color = DeepSlate, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text("شارك مفاتيحك مع جهاز آخر عبر رابط qabas://keys/import", color = TextSecondary, fontFamily = CairoFont, fontSize = 11.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                Button(
+                                    onClick = {
+                                        val activeKeys = mutableMapOf<String, String>()
+                                        if (geminiKey.isNotBlank()) activeKeys["gemini_key"] = geminiKey
+                                        if (groqKey.isNotBlank()) activeKeys["groq_key"] = groqKey
+                                        if (openaiKey.isNotBlank()) activeKeys["openai_key"] = openaiKey
+                                        if (huggingfaceKey.isNotBlank()) activeKeys["huggingface_key"] = huggingfaceKey
+                                        if (azureSpeechKey.isNotBlank()) activeKeys["azure_speech_key"] = azureSpeechKey
+                                        if (azureSpeechRegion.isNotBlank()) activeKeys["azure_speech_region"] = azureSpeechRegion
+                                        if (elevenLabsKey.isNotBlank()) activeKeys["elevenlabs_key"] = elevenLabsKey
+                                        if (pexelsKey.isNotBlank()) activeKeys["pexels_key"] = pexelsKey
+                                        if (pixabayKey.isNotBlank()) activeKeys["pixabay_key"] = pixabayKey
+                                        shareLink = KeyDeepLinkHandler.generateShareLink(activeKeys)
+                                        showShareDialog = true
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22D3EE)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("إنشاء رابط مشاركة 📤", color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+                                Button(
+                                    onClick = {
+                                        showSmartPasteDialog = true
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF141C27)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Input, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("استيراد من رابط 📥", color = TextSecondary, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 item {
                     LiveHealthCheckPanel()
                 }
