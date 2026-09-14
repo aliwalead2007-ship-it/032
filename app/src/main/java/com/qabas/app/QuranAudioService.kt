@@ -38,14 +38,26 @@ object QuranAudioService {
     private var tokenExpiryMs: Long = 0L
 
     fun isConfigured(): Boolean {
-        val id = BuildConfig.QF_CLIENT_ID
-        val secret = BuildConfig.QF_CLIENT_SECRET
-        return id.isNotBlank() && id != "your_key" &&
-            secret.isNotBlank() && secret != "your_key"
+        val id = buildConfigKey("QF_CLIENT_ID")
+        val secret = buildConfigKey("QF_CLIENT_SECRET")
+        return !id.isNullOrBlank() && id != "your_key" &&
+            !secret.isNullOrBlank() && secret != "your_key"
     }
 
-    private fun clientId(): String = BuildConfig.QF_CLIENT_ID
-    private fun clientSecret(): String = BuildConfig.QF_CLIENT_SECRET
+    /**
+     * قراءة مفتاح من BuildConfig بالانعكاس بدل المرجع المباشر — لأن حقل
+     * secrets-gradle-plugin لا يُولَّد إلا إذا وُجد المفتاح في ملف `.env`
+     * (والـ CI يبنيه بمفاتيح ثابتة). المرجع المباشر كان يكسر التجميع
+     * (`unresolved reference`) كلما غاب المفتاح. يُرجع null عند الغياب.
+     */
+    private fun buildConfigKey(name: String): String? = try {
+        BuildConfig::class.java.getField(name).get(null) as? String
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun clientId(): String = buildConfigKey("QF_CLIENT_ID") ?: ""
+    private fun clientSecret(): String = buildConfigKey("QF_CLIENT_SECRET") ?: ""
 
     /**
      * توكن OAuth2 (client_credentials + scope=content) مع تخزين مؤقت حتى انتهائه.
