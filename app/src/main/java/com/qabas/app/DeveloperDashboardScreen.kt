@@ -52,7 +52,7 @@ enum class DashboardSection {
     MAIN, REQUESTS, SYSTEM_CONTROLS, NOTIFICATIONS, USERS, STATS, LOGS,
     CRASH_LOGS, ACCOUNT_SETTINGS, PROMO_CODES, REVENUE, DEV_STUDIO_SIGNATURE,
     AGENCY_MONETIZATION, DEV_PORTFOLIO_SHOWCASE, APP_DOCTOR, STYLE_BRAIN,
-    API_KEYS, AUDIT_LOG, BACKUP, PRODUCTION_PIPELINE
+    API_KEYS, AUDIT_LOG, BACKUP, PRODUCTION_PIPELINE, DIAGNOSTICS
 }
 
 data class DevUser(
@@ -170,6 +170,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                             DashboardSection.STYLE_BRAIN -> "عقل الأساليب 🧠"
                             DashboardSection.API_KEYS -> "مفاتيح API 🔑"
                             DashboardSection.PRODUCTION_PIPELINE -> "مسار الإنتاج 🎬"
+                            DashboardSection.DIAGNOSTICS -> "تشخيص شامل 🏥"
                         }, 
                         color = GoldPrimary, 
                         fontWeight = FontWeight.Bold, 
@@ -312,6 +313,7 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                         onAuditLog = { currentSection = DashboardSection.AUDIT_LOG },
                         onBackup = { currentSection = DashboardSection.BACKUP },
                         onProductionPipeline = { currentSection = DashboardSection.PRODUCTION_PIPELINE },
+                        onDiagnostics = { currentSection = DashboardSection.DIAGNOSTICS },
                         userCount = devUsers.size
                     )
                 }
@@ -377,6 +379,9 @@ fun DeveloperDashboardScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit = 
                 DashboardSection.PRODUCTION_PIPELINE -> {
                     ProductionPipelineSection(context = context)
                 }
+                DashboardSection.DIAGNOSTICS -> {
+                    DiagnosticsDashboardSection(context = context)
+                }
             }
         }
     }
@@ -403,6 +408,7 @@ onAppDoctor: () -> Unit,
                         onAuditLog: () -> Unit = {},
                         onBackup: () -> Unit = {},
                         onProductionPipeline: () -> Unit = {},
+                        onDiagnostics: () -> Unit = {},
                         userCount: Int = 0
                     ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -518,7 +524,8 @@ onAppDoctor: () -> Unit,
             Triple("مفاتيح API 🔑", Icons.Default.VpnKey, onApiKeys),
             Triple("سجل التدقيق 📋", Icons.Default.History, onAuditLog),
             Triple("نسخ احتياطي واسترجاع 📦", Icons.Default.Backup, onBackup),
-            Triple("مسار الإنتاج 🎬", Icons.Default.PlayCircle, onProductionPipeline)
+            Triple("مسار الإنتاج 🎬", Icons.Default.PlayCircle, onProductionPipeline),
+            Triple("تشخيص شامل 🏥", Icons.Default.MedicalServices, onDiagnostics)
         )
 
         LazyVerticalGrid(
