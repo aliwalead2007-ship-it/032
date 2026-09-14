@@ -254,7 +254,32 @@ fun ProcessingScreen(
             progress = 0.20f
             notificationService.showProgressNotification(20, 100, statusText)
 
-            val isParallelEnabled = prefs.getBoolean("enable_parallel_processing", false)
+            // حفظ المشاهد في prefs للاسترجاع عند إعادة التشغيل
+            try {
+                val scenesJson = org.json.JSONArray().apply {
+                    scenes.forEach { s ->
+                        put(org.json.JSONObject().apply {
+                            put("title", s.title)
+                            put("description", s.description)
+                            put("durationInSeconds", s.durationInSeconds)
+                            put("visualEffect", s.visualEffect)
+                            put("tempo", s.tempo)
+                            put("transitionType", s.transitionType)
+                            put("mediaUrl", s.mediaUrl ?: "")
+                        })
+                    }
+                }
+                prefs.edit().putString("cached_scenes", scenesJson.toString())
+                    .putLong("cached_scenes_time", System.currentTimeMillis()).apply()
+            } catch (_: Exception) {}
+
+            val isParallelEnabled = prefs.getBoolean("enable_parallel_processing", true)
+            val deviceCores = Runtime.getRuntime().availableProcessors()
+            val parallelism = when {
+                deviceCores <= 4 -> 2
+                deviceCores <= 6 -> 3
+                else -> 4
+            }
 
             suspend fun processOneScene(index: Int, scene: Scene): Scene {
                 var finalMedia = scene.mediaUrl ?: ""
@@ -289,7 +314,7 @@ fun ProcessingScreen(
             }
 
             val processedScenes = if (isParallelEnabled) {
-                val semaphore = kotlinx.coroutines.sync.Semaphore(3)
+                val semaphore = kotlinx.coroutines.sync.Semaphore(parallelism)
                 withContext(Dispatchers.IO) {
                     kotlinx.coroutines.coroutineScope {
                         scenes.mapIndexed { index, scene ->
@@ -418,6 +443,7 @@ fun ProcessingScreen(
                 statusText = Translator.tr("اكتملت المعالجة بنجاح!")
                 pushActivity(statusText)
                 notificationService.showCompletionNotification()
+                prefs.edit().remove("cached_scenes").remove("cached_scenes_time").apply()
                 try { QabasUx.successHaptic(context) } catch (_: Exception) {}
                 elapsedJobRef.value?.cancel()
                 kotlinx.coroutines.delay(700)

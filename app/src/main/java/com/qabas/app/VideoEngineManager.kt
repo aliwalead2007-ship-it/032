@@ -115,10 +115,23 @@ class VideoEngineManager(private val context: Context) {
                 )
             }
 
-            // Ensure cache directory exists
+            // فحص مساحة التخزين قبل بدء المعالجة
             val cacheDir = File(context.cacheDir, "qabas_engine")
             if (!cacheDir.exists()) cacheDir.mkdirs()
-            cacheDir.listFiles()?.forEach { it.delete() } // Clean previous runs
+            val usableBytes = cacheDir.usableSpace
+            val usableMB = usableBytes / (1024 * 1024)
+            if (usableMB < 200L) {
+                onProgress(0f, "مساحة التخزين منخفضة جداً (${usableMB}MB) — يرجى تحرير مساحة")
+                SystemLogsManager.addLog("ERROR", "فشل: مساحة التخزين منخفضة (${usableMB}MB < 200MB)", Color(0xFFEF4444))
+                return@withContext null
+            } else if (usableMB < 500L) {
+                onProgress(0f, "تنبيه: مساحة التخزين محدودة (${usableMB}MB) — قد تتأثر الجودة")
+                SystemLogsManager.addLog("WARN", "مساحة التخزين محدودة (${usableMB}MB) — جودة قد تتأثر", Color(0xFFE8C547))
+            }
+            cacheDir.listFiles()?.forEach { f ->
+                val ageMs = System.currentTimeMillis() - f.lastModified()
+                if (ageMs > 3_600_000L) f.delete() // حذف الأقدم من ساعة فقط
+            }
 
             validScenes.forEachIndexed { index, scene ->
                 if (!this@withContext.isActive) {
@@ -561,40 +574,47 @@ class VideoEngineManager(private val context: Context) {
             } catch (_: Exception) {}
         }
 
-        // 2. Network download
+        // 2. Network download (3 محاولات بتأخير تصاعدي)
         val sessionFile = File(cacheDir, "dl_media_${index}_${System.currentTimeMillis()}.$targetExt")
-        try {
-            val connection = (java.net.URL(cleanUrl).openConnection() as java.net.HttpURLConnection).apply {
-                connectTimeout = 12_000
-                readTimeout = 25_000
-                instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; QabasStudio/1.2)")
-            }
-            connection.connect()
+        var lastException: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                val connection = (java.net.URL(cleanUrl).openConnection() as java.net.HttpURLConnection).apply {
+                    connectTimeout = 12_000
+                    readTimeout = 25_000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13; QabasStudio/1.2)")
+                }
+                connection.connect()
 
-            if (connection.responseCode in 200..299) {
-                connection.inputStream.use { input ->
-                    FileOutputStream(sessionFile).use { output ->
-                        input.copyTo(output)
+                if (connection.responseCode in 200..299) {
+                    connection.inputStream.use { input ->
+                        FileOutputStream(sessionFile).use { output ->
+                            input.copyTo(output)
+                        }
                     }
+                    if (sessionFile.exists() && sessionFile.length() > 30_000L) {
+                        try { sessionFile.copyTo(persisted, overwrite = true) } catch (_: Exception) {}
+                        return@withContext sessionFile
+                    }
+                } else {
+                    throw java.io.IOException("HTTP ${connection.responseCode}")
                 }
-                if (sessionFile.exists() && sessionFile.length() > 30_000L) {
-                    try {
-                        sessionFile.copyTo(persisted, overwrite = true)
-                    } catch (_: Exception) {}
-                    return@withContext sessionFile
+            } catch (e: Exception) {
+                lastException = e
+                if (attempt < 3) {
+                    val delayMs = attempt * 1500L
+                    Log.d(TAG, "B-Roll download attempt $attempt failed, retrying in ${delayMs}ms: ${e.message}")
+                    kotlinx.coroutines.delay(delayMs)
                 }
-            } else {
-                throw java.io.IOException("HTTP ${connection.responseCode}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "B-Roll download failed: $cleanUrl → ${e.message}")
-            SystemLogsManager.addLog(
-                "WARN",
-                "تعذر تحميل الوسائط (شبكة/رابط) — استخدام إطار سينمائي محلي",
-                Color(0xFFE8C547)
-            )
         }
+        Log.e(TAG, "B-Roll download failed after 3 attempts: $cleanUrl → ${lastException?.message}")
+        SystemLogsManager.addLog(
+            "WARN",
+            "تعذر تحميل الوسائط بعد 3 محاولات — استخدام إطار سينمائي محلي",
+            Color(0xFFE8C547)
+        )
 
         // 3. Offline cinematic fallback
         generateSolidColorVideo(cacheDir, index, 5, styleAnalysis, null)
