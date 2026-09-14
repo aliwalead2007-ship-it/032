@@ -1034,12 +1034,10 @@ object StyleBrain {
                 }
                 if (success) {
                     evolveCoreStyleWithNewAbsorption(context, updated)
-                    CoroutineScope(Dispatchers.IO).launch {
-                        try {
-                            TasteManager.registerPreference(context, "STYLE", target.visualTraits.joinToString("، "), 3)
-                            TasteManager.registerPreference(context, "PACING", target.motionTraits.joinToString("، "), 3)
-                        } catch (_: Exception) {}
-                    }
+                    try {
+                        TasteManager.registerPreference(context, "STYLE", target.visualTraits.joinToString("، "), 3)
+                        TasteManager.registerPreference(context, "PACING", target.motionTraits.joinToString("، "), 3)
+                    } catch (_: Exception) {}
                 }
                 Log.d("StyleBrain", "Production result recorded for style ${target.name}: success=$success, newScore=$newScore")
             } else {

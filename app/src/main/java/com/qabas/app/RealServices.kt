@@ -69,15 +69,29 @@ object KeyVault {
     }
 }
 
-object RealGeminiService {
-    private val client = OkHttpClient.Builder()
+/** استخراج النص من استجابة Gemini الموحدة — يُعيد null عند الفشل */
+private fun extractGeminiText(responseJson: JSONObject): String? {
+    val candidates = responseJson.optJSONArray("candidates") ?: return null
+    if (candidates.length() == 0) return null
+    val parts = candidates.getJSONObject(0)
+        .optJSONObject("content")?.optJSONArray("parts") ?: return null
+    if (parts.length() == 0) return null
+    return parts.getJSONObject(0).optString("text", "").trim()
+}
+
+/** عميل HTTP مشترك لجميع خدمات الذكاء الاصطناعي — يُعاد استخدام اتصالات الاتصال ويوفر الذاكرة */
+object SharedHttpClient {
+    val instance: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
+}
+
+object RealGeminiService {
+    private val client = SharedHttpClient.instance
         
     
     suspend fun analyzeIdea(idea: String): IdeaAnalysis = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.gemini
         val fallbackResult = buildDefaultIdeaAnalysis(idea)
         
@@ -140,12 +154,8 @@ object RealGeminiService {
             if (response.isSuccessful) {
                 val responseData = response.body?.string() ?: ""
                 val responseJson = JSONObject(responseData)
-                val candidates = responseJson.optJSONArray("candidates")
-                if (candidates != null && candidates.length() > 0) {
-                    val content = candidates.getJSONObject(0).optJSONObject("content")
-                    val parts = content?.optJSONArray("parts")
-                    if (parts != null && parts.length() > 0) {
-                        val text = parts.getJSONObject(0).optString("text")
+                val text = extractGeminiText(responseJson)
+                if (!text.isNullOrBlank()) {
                         val cleanJson = text.replace("```json", "").replace("```", "").trim()
                         val resultObj = JSONObject(cleanJson)
                         
@@ -189,14 +199,12 @@ object RealGeminiService {
                             themes = themesList
                         )
                     }
-                }
             }
             throw Exception("Failed to analyze idea")
         }
     }
 
     suspend fun transcribeAudio(audioFile: File): String = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         var apiKey = KeyVault.gemini
         if (apiKey.isBlank()) {
             apiKey = KeyVault.groq
@@ -244,13 +252,9 @@ object RealGeminiService {
             val responseBodyString = response.body?.string() ?: ""
             if (response.isSuccessful) {
                 val jsonResponse = JSONObject(responseBodyString)
-                val candidates = jsonResponse.optJSONArray("candidates")
-                if (candidates != null && candidates.length() > 0) {
-                    val content = candidates.getJSONObject(0).getJSONObject("content")
-                    val parts = content.getJSONArray("parts")
-                    if (parts.length() > 0) {
-                        return@safeApiCall parts.getJSONObject(0).getString("text").trim()
-                    }
+                val text = extractGeminiText(jsonResponse)
+                if (!text.isNullOrBlank()) {
+                    return@safeApiCall text
                 }
             }
             ""
@@ -258,7 +262,6 @@ object RealGeminiService {
     }
 
     suspend fun analyzeVideoStyle(url: String): VideoStyleAnalysis = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.gemini
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
             return@withContext VideoStyleAnalysis(detectedStyle = "تأكد من إعداد مفتاح API.")
@@ -313,12 +316,8 @@ object RealGeminiService {
             
             if (response.isSuccessful) {
                 val jsonResponse = JSONObject(responseBodyString)
-                val candidates = jsonResponse.optJSONArray("candidates")
-                if (candidates != null && candidates.length() > 0) {
-                    val content = candidates.getJSONObject(0).getJSONObject("content")
-                    val parts = content.getJSONArray("parts")
-                    if (parts.length() > 0) {
-                        val text = parts.getJSONObject(0).getString("text")
+                val text = extractGeminiText(jsonResponse)
+                if (!text.isNullOrBlank()) {
                         val cleanJson = text.replace("```json", "").replace("```", "").trim()
                         val obj = JSONObject(cleanJson)
                         
@@ -343,7 +342,6 @@ object RealGeminiService {
                         
                         return@safeApiCall analysisResult
                     }
-                }
             }
             throw Exception("Failed to parse Gemini response")
         }
@@ -368,7 +366,6 @@ object RealGeminiService {
                 androidx.compose.ui.graphics.Color(0xFFE8C547)
             )
         }
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.gemini
             
         val fallbackScenes = buildDefaultFallbackScenes(idea)
@@ -427,9 +424,7 @@ object RealGeminiService {
             if (response.isSuccessful) {
                 val responseBody = response.body?.string() ?: ""
                 val responseJson = JSONObject(responseBody)
-                val textResponse = responseJson.getJSONArray("candidates")
-                    .getJSONObject(0).getJSONObject("content").getJSONArray("parts")
-                    .getJSONObject(0).getString("text")
+                val textResponse = extractGeminiText(responseJson) ?: return@safeApiCallWithRetry fallbackScenes
 
                 // Extract JSON array from text response if it's wrapped in markdown
                 val cleanJson = if (textResponse.contains("[")) textResponse.substring(textResponse.indexOf("["), textResponse.lastIndexOf("]") + 1) else textResponse
@@ -640,7 +635,6 @@ object RealGeminiService {
     }
 
     suspend fun generateDeveloperPrompts(request: AppRequestService.AppRequest): String = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.gemini
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
             return@withContext "حدث خطأ أثناء إنشاء الأوامر." 
@@ -712,10 +706,9 @@ object RealGeminiService {
 }
 
 object RealMediaLibraryService {
-    private val client = OkHttpClient()
+    private val client = SharedHttpClient.instance
 
     suspend fun fetchMedia(query: String, type: String = "video"): String = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val cleanQuery = ContentFilterService.filterImageQuery(query)
         val visualKeywords = BRollEngine.mapArabicToVisualKeywords(cleanQuery)
         
@@ -841,7 +834,6 @@ object RealMediaLibraryService {
         messages: List<Pair<Boolean, String>>,
         customSystemInstruction: String? = null
     ): String = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.gemini
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
             return@withContext "عذراً، مفتاح Gemini غير متوفر. يرجى إضافته من الإعدادات."
@@ -886,13 +878,9 @@ object RealMediaLibraryService {
             if (response.isSuccessful) {
                 val responseData = response.body?.string() ?: ""
                 val responseJson = org.json.JSONObject(responseData)
-                val candidates = responseJson.optJSONArray("candidates")
-                if (candidates != null && candidates.length() > 0) {
-                    val content = candidates.getJSONObject(0).optJSONObject("content")
-                    val parts = content?.optJSONArray("parts")
-                    if (parts != null && parts.length() > 0) {
-                        return@safeApiCallWithRetry parts.getJSONObject(0).optString("text")
-                    }
+                val text = extractGeminiText(responseJson)
+                if (!text.isNullOrBlank()) {
+                    return@safeApiCallWithRetry text
                 }
             }
             "حدث خطأ أثناء معالجة الرد."
@@ -901,10 +889,9 @@ object RealMediaLibraryService {
 }
 
 object RealGroqService {
-    private val client = OkHttpClient()
+    private val client = SharedHttpClient.instance
 
     suspend fun chatOrGenerate(prompt: String): String? = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.groq
         if (apiKey.isBlank()) return@withContext null
 
@@ -951,10 +938,9 @@ object RealGroqService {
 }
 
 object RealOpenAIService {
-    private val client = OkHttpClient()
+    private val client = SharedHttpClient.instance
 
     suspend fun chatOrGenerate(prompt: String): String? = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         var apiKey = KeyVault.openai
         if (apiKey.isBlank()) return@withContext null
 
@@ -997,10 +983,9 @@ object RealOpenAIService {
 }
 
 object RealHuggingFaceService {
-    private val client = OkHttpClient()
+    private val client = SharedHttpClient.instance
 
     suspend fun generateImage(prompt: String): String? = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.huggingface
         if (apiKey.isBlank()) return@withContext null
 
@@ -1032,10 +1017,7 @@ object RealHuggingFaceService {
 }
 
 object RealAzureSpeechService {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .build()
+    private val client = SharedHttpClient.instance
 
     suspend fun synthesizeSpeech(
         text: String,
@@ -1043,7 +1025,6 @@ object RealAzureSpeechService {
         rate: String = "+0%",
         pitch: String = "+0%"
     ): String? = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.azureSpeechKey
         var region = KeyVault.azureSpeechRegion.ifBlank { "eastus" }
 
@@ -1106,10 +1087,7 @@ object RealAzureSpeechService {
 }
 
 object RealElevenLabsService {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(60, TimeUnit.SECONDS)
-        .build()
+    private val client = SharedHttpClient.instance
 
     suspend fun synthesizeSpeech(
         text: String,
@@ -1117,7 +1095,6 @@ object RealElevenLabsService {
         stability: Double = 0.5,
         similarityBoost: Double = 0.75
     ): String? = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.elevenlabs
 
         if (apiKey.isBlank()) {
@@ -1612,7 +1589,6 @@ object AppServices {
     }
 
     suspend fun getTrendingIdeas(): List<TrendingIdea> = withContext(Dispatchers.IO) {
-        val prefs = AppServices.appContext.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
         val apiKey = KeyVault.gemini
 
         val defaultIdeas = listOf(

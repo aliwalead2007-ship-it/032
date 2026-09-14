@@ -34,6 +34,11 @@ enum class ExportQualityPreset(
 object VideoProcessor {
     private const val TAG = "VideoProcessor"
 
+    /** عتبات الحجم الأدنى الموحدة للملفات — تُستخدم في كل مكان لضمان اتساق الفحص */
+    const val MIN_SCENE_SIZE = 8_000L    // مشهد واحد صالح بعد معالجة FFmpeg
+    const val MIN_OUTPUT_SIZE = 15_000L  // ملف فيديو نهائي مُصدّر
+    const val MIN_LENIENT_SIZE = 5_000L  // فحص متساهل عند الطوارئ/الدمج
+
     var currentQualityPreset: ExportQualityPreset = ExportQualityPreset.BALANCED
 
     /**
@@ -63,7 +68,7 @@ object VideoProcessor {
      */
     fun isValidVideoFile(
         path: String,
-        minSizeBytes: Long = 15_000L,
+        minSizeBytes: Long = MIN_OUTPUT_SIZE,
         requireAudio: Boolean = false
     ): Boolean {
         val file = File(path)
@@ -165,19 +170,19 @@ object VideoProcessor {
         // Robust merge: maps video and audio, resamples audio cleanly to 44.1kHz stereo to avoid desync
         val command = "-y -i \"$videoPath\" -i \"$audioPath\" -c:v copy -c:a aac -b:a ${currentQualityPreset.audioBitrate} -ar 44100 -ac 2 -map 0:v:0 -map 1:a:0 -shortest \"$outputPath\""
         val success = executeCommand(command, "دمج التعليق الصوتي مع مشهد الفيديو")
-        if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+        if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
 
         // Fallback: re-encode video stream if stream-copy fails due to codec mismatch
         val fallbackCmd = "-y -i \"$videoPath\" -i \"$audioPath\" -c:v libx264 -preset ${currentQualityPreset.preset} -crf ${currentQualityPreset.crf} -c:a aac -b:a 128k -ar 44100 -ac 2 -map 0:v:0 -map 1:a:0 -shortest \"$outputPath\""
         val fallbackOk = executeCommand(fallbackCmd, "محاولة دمج بديلة للصوت والفيديو")
-        return fallbackOk && isValidVideoFile(outputPath, minSizeBytes = 8_000L)
+        return fallbackOk && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)
     }
 
     suspend fun mergeAmbientAudio(context: Context, videoPath: String, ambientAudioPath: String, outputPath: String): Boolean {
         // ثورة قبس (Audio Ducking): خفض صوت الخلفية تلقائياً عند حديث المعلق الصوتي
         val command = "-y -i \"$videoPath\" -i \"$ambientAudioPath\" -filter_complex \"[1:a]volume=0.4[bg];[bg][0:a]sidechaincompress=threshold=0.05:ratio=4:attack=5:release=500[ducked_bg];[0:a][ducked_bg]amix=inputs=2:duration=first:dropout_transition=2[a]\" -map 0:v -map \"[a]\" -c:v copy -c:a aac -b:a ${currentQualityPreset.audioBitrate} \"$outputPath\""
         val success = executeCommand(command, "خلط الصوت المحيطي مع Audio Ducking")
-        if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+        if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
 
         Log.w(TAG, "mergeAmbientAudio failed — keeping video without ambient mix")
         SystemLogsManager.addLog("WARN", "تعذر خلط الصوت المحيطي — تم الاحتفاظ بالمشهد بدون مزج", Color(0xFFE8C547))
@@ -198,7 +203,7 @@ object VideoProcessor {
             val command = "-y -i \"$videoPath\" -i \"${overlayImg.absolutePath}\" -filter_complex \"[0:v][1:v]overlay=(main_w-overlay_w)/2:(main_h*0.68)-(overlay_h/2)\" -c:v libx264 -preset ${currentQualityPreset.preset} -crf ${currentQualityPreset.crf} -c:a copy \"$outputPath\""
             val success = executeCommand(command, "إضافة النص والكابشن للمشهد داخل المنطقة الآمنة")
             overlayImg.delete()
-            if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+            if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
         }
         // لا نكذب: ننسخ الفيديو الأصلي ونسجل الفشل صراحة
         Log.w(TAG, "addTextOverlay failed — returning original video without text overlay")
@@ -233,13 +238,9 @@ object VideoProcessor {
             ).lowercase(Locale.ROOT)
 
         // ثورة قبس (Kinetic Typography): تفعيل دائماً للكابشن الحركي (كلمة بكلمة)
-        val isWordByWord = true
-
-        if (isWordByWord) {
-            val ok = addWordByWordOverlay(context, videoPath, text, styleAnalysis ?: VideoStyleAnalysis(), outputPath)
-            if (ok) return true
-            // سقوط آمن إلى كابشن ثابت
-        }
+        val ok = addWordByWordOverlay(context, videoPath, text, styleAnalysis ?: VideoStyleAnalysis(), outputPath)
+        if (ok) return true
+        // سقوط آمن إلى كابشن ثابت
 
         val overlayImg = createArabicTextBitmap(context, text, isWatermark = false, styleAnalysis = styleAnalysis)
         if (overlayImg != null && overlayImg.exists()) {
@@ -257,7 +258,7 @@ object VideoProcessor {
             val command = "-y -i \"$videoPath\" -i \"${overlayImg.absolutePath}\" -filter_complex \"[0:v][1:v]overlay=(main_w-overlay_w)/2:$yExpr\" -c:v libx264 -preset ${currentQualityPreset.preset} -crf ${currentQualityPreset.crf} -c:a copy \"$outputPath\""
             val success = executeCommand(command, "إضافة نصوص الأسلوب المخصص داخل المنطقة الآمنة")
             overlayImg.delete()
-            if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+            if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
         }
         return addTextOverlay(context, videoPath, text, outputPath)
     }
@@ -344,7 +345,7 @@ object VideoProcessor {
                 Color(0xFFE8C547)
             )
             val success = executeCommand(command, "إضافة كابشن WordByWord (${bitmaps.size} مراحل)")
-            return success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)
+            return success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)
         } catch (e: Exception) {
             Log.e(TAG, "WordByWord overlay failed", e)
             return false
@@ -359,7 +360,7 @@ object VideoProcessor {
             val command = "-y -i \"$videoPath\" -i \"${overlayImg.absolutePath}\" -filter_complex \"[0:v][1:v]overlay=(main_w-overlay_w)/2:main_h*0.12\" -c:v libx264 -preset ${currentQualityPreset.preset} -crf ${currentQualityPreset.crf} -c:a copy \"$outputPath\""
             val success = executeCommand(command, "طباعة الختم والعلامة المائية في المنطقة الآمنة")
             overlayImg.delete()
-            if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+            if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
         }
         Log.w(TAG, "addDeveloperWatermarkOverlay failed — returning original video without watermark")
         SystemLogsManager.addLog("WARN", "تعذر طباعة الختم — تم الاحتفاظ بالمشهد بدون علامة مائية", Color(0xFFE8C547))
@@ -602,7 +603,7 @@ object VideoProcessor {
 
         // 3) طارئ
         val lastResort = "-y -loop 1 -i \"$imagePath\" -c:v libx264 -t $safeDuration -preset ultrafast -crf 28 -r 24 -vf \"scale=720:1280,format=yuv420p\" \"$outputPath\""
-        return executeCommand(lastResort, "توليد مشهد طارئ بسيط") && isValidVideoFile(outputPath, minSizeBytes = 5_000L)
+        return executeCommand(lastResort, "توليد مشهد طارئ بسيط") && isValidVideoFile(outputPath, minSizeBytes = MIN_LENIENT_SIZE)
     }
 
     suspend fun concatenateVideos(context: Context, videoPaths: List<String>, outputPath: String): Boolean {
@@ -705,7 +706,7 @@ object VideoProcessor {
             val audioMap = if (allHaveAudio) "-map \"[a]\"" else "-map 0:a?"
             val command = "-y $inputsStr -filter_complex \"$fc\" -map \"[v]\" $audioMap -c:v libx264 -preset ${currentQualityPreset.preset} -crf ${currentQualityPreset.crf} -c:a aac -b:a ${currentQualityPreset.audioBitrate} \"$outputPath\""
             val success = executeCommand(command, "دمج المشاهد (${videoPaths.size}) مع انتقالات سنيمائية ($xfadeFilterName)")
-            if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+            if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
         } catch (e: Exception) {
             Log.w(TAG, "xfade multi-scene failed: ${e.message}")
         }
@@ -858,7 +859,7 @@ object VideoProcessor {
             Color(0xFFE8C547)
         )
         val success = executeCommand(command, "تطبيق فلاتر StyleDirective ($filterHint)")
-        if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+        if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
         Log.w(TAG, "applyStyleClonedFilters failed — keeping original without color grade")
         SystemLogsManager.addLog("WARN", "تعذر تطبيق فلاتر الأسلوب — تم الاحتفاظ بالمشهد بدون تدريج لوني", Color(0xFFE8C547))
         return try {
@@ -903,7 +904,7 @@ object VideoProcessor {
 
         val command = "-y -i \"$videoPath\" -vf \"$eqFilter\" -c:v libx264 -preset ${currentQualityPreset.preset} -crf ${currentQualityPreset.crf} -c:a copy \"$outputPath\""
         val success = executeCommand(command, "تطبيق التدريج اللوني (Color Grading: $templateName)")
-        if (success && isValidVideoFile(outputPath, minSizeBytes = 8_000L)) return true
+        if (success && isValidVideoFile(outputPath, minSizeBytes = MIN_SCENE_SIZE)) return true
         Log.w(TAG, "applyCinematicColorGrading failed — keeping original without grade")
         SystemLogsManager.addLog("WARN", "تعذر تطبيق التدريج اللوني — تم الاحتفاظ بالمشهد بدون فلتر", Color(0xFFE8C547))
         return try {

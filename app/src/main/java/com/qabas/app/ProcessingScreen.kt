@@ -436,7 +436,7 @@ fun ProcessingScreen(
                         StyleBrain.recordProductionResult(context, effectiveStyle.id, success = true)
                         ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.STYLE_FEEDBACK, ProductionPipelineTracker.Result.SUCCESS, "تغذية راجعة: نجاح الأسلوب ${effectiveStyle.id}", "", 0)
                         if (StyleBrain.isContinuousLearningEnabled.value) {
-                            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                            launch(Dispatchers.IO) {
                                 StyleBrain.runContinuousLearningAnalysis(context)
                             }
                         }
@@ -543,11 +543,6 @@ private fun ProcessingScreenUI(
     onConfirmCancel: () -> Unit
 ) {
     val scrollState = rememberScrollState()
-
-    // تمرير تلقائي لأعلى السجل عند إضافة سطر جديد
-    LaunchedEffect(activityLog.firstOrNull()) {
-        // السجل يعرض الأحدث أولاً — لا حاجة لتمرير سفلي
-    }
 
     if (showCancelDialog) {
         AlertDialog(

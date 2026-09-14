@@ -101,12 +101,6 @@ class VideoEngineManager(private val context: Context) {
                     "تفعيل المسار المضمون السريع — جودة: ${VideoProcessor.currentQualityPreset.label}",
                     Color(0xFFE8C547)
                 )
-            } else if (deviceProfile.isLowEnd) {
-                SystemLogsManager.addLog(
-                    "WARN",
-                    "تفعيل مسار المعالجة الخفيف للأداء (جودة: ${VideoProcessor.currentQualityPreset.label}): ${deviceProfile.reason}",
-                    Color(0xFFE8C547)
-                )
             } else {
                 SystemLogsManager.addLog(
                     "INFO",
@@ -217,7 +211,7 @@ class VideoEngineManager(private val context: Context) {
                     }
 
                     // Hard check: generation failed or invalid video → solid fallback
-                    if (videoReadyPath.isBlank() || !VideoProcessor.isValidVideoFile(videoReadyPath, minSizeBytes = 8_000L)) {
+                    if (videoReadyPath.isBlank() || !VideoProcessor.isValidVideoFile(videoReadyPath, minSizeBytes = VideoProcessor.MIN_SCENE_SIZE)) {
                         SystemLogsManager.addLog(
                             "WARN",
                             "فشل توليد مشهد ${index + 1} من الوسائط — استخدام إطار سينمائي محلي",
@@ -252,7 +246,7 @@ class VideoEngineManager(private val context: Context) {
                     val videoWithAudioPath = if (!audioPath.isNullOrBlank() && File(audioPath).exists() && File(audioPath).length() > 1000) {
                         val out = File(cacheDir, "vid_audio_$index.mp4").absolutePath
                         val success = VideoProcessor.mergeAudioVideo(context, videoReadyPath, audioPath, out)
-                        if (success && VideoProcessor.isValidVideoFile(out, minSizeBytes = 8_000L)) out else videoReadyPath
+                        if (success && VideoProcessor.isValidVideoFile(out, minSizeBytes = VideoProcessor.MIN_SCENE_SIZE)) out else videoReadyPath
                     } else {
                         videoReadyPath
                     }
@@ -277,7 +271,7 @@ class VideoEngineManager(private val context: Context) {
                         if (txtEx is CancellationException) throw txtEx
                         false
                     }
-                    var scenePathAfterText = if (textSuccess && VideoProcessor.isValidVideoFile(textOverlayPath, minSizeBytes = 8_000L)) {
+                    var scenePathAfterText = if (textSuccess && VideoProcessor.isValidVideoFile(textOverlayPath, minSizeBytes = VideoProcessor.MIN_SCENE_SIZE)) {
                         textOverlayPath
                     } else {
                         videoWithAudioPath
@@ -297,7 +291,7 @@ class VideoEngineManager(private val context: Context) {
                         } catch (_: Exception) {
                             false
                         }
-                        if (gradeOk && VideoProcessor.isValidVideoFile(gradedPath, minSizeBytes = 8_000L)) {
+                        if (gradeOk && VideoProcessor.isValidVideoFile(gradedPath, minSizeBytes = VideoProcessor.MIN_SCENE_SIZE)) {
                             scenePathAfterText = gradedPath
                             SystemLogsManager.addLog(
                                 "INFO",
@@ -348,7 +342,7 @@ class VideoEngineManager(private val context: Context) {
             }
             val rawConcatPath = File(cacheDir, "raw_concat_output.mp4").absolutePath
             // تصفية المشاهد الصالحة فقط قبل الدمج — ملف غير صالح واحد يفشل السلسلة كلها
-            val validPaths = processedVideoPaths.filter { VideoProcessor.isValidVideoFile(it, minSizeBytes = 5_000L) }
+            val validPaths = processedVideoPaths.filter { VideoProcessor.isValidVideoFile(it, minSizeBytes = VideoProcessor.MIN_LENIENT_SIZE) }
             if (validPaths.isEmpty()) {
                 SystemLogsManager.addLog(
                     "ERROR",
@@ -381,7 +375,7 @@ class VideoEngineManager(private val context: Context) {
                 concatSuccess = VideoProcessor.concatenateVideos(context, validPaths, rawConcatPath)
             }
 
-            if (!concatSuccess || !VideoProcessor.isValidVideoFile(rawConcatPath, minSizeBytes = 8_000L)) {
+            if (!concatSuccess || !VideoProcessor.isValidVideoFile(rawConcatPath, minSizeBytes = VideoProcessor.MIN_SCENE_SIZE)) {
                 Log.e(TAG, "Failed to concatenate videos")
                 SystemLogsManager.addLog(
                     "ERROR",
@@ -403,7 +397,7 @@ class VideoEngineManager(private val context: Context) {
             } catch (_: Exception) {
                 false
             }
-            if (!gradedOk || !VideoProcessor.isValidVideoFile(concatOutputPath, minSizeBytes = 8_000L)) {
+            if (!gradedOk || !VideoProcessor.isValidVideoFile(concatOutputPath, minSizeBytes = VideoProcessor.MIN_SCENE_SIZE)) {
                 File(rawConcatPath).copyTo(File(concatOutputPath), overwrite = true)
             }
 
@@ -462,7 +456,7 @@ class VideoEngineManager(private val context: Context) {
             }
 
             val sourceFile = File(currentWorkingVideoPath)
-            if (!VideoProcessor.isValidVideoFile(sourceFile.absolutePath, minSizeBytes = 15_000L)) {
+            if (!VideoProcessor.isValidVideoFile(sourceFile.absolutePath, minSizeBytes = VideoProcessor.MIN_OUTPUT_SIZE)) {
                 SystemLogsManager.addLog(
                     "ERROR",
                     "الملف النهائي غير صالح (لا يحتوي مساراً مرئياً أو مدة كافية) — فشل التصدير 🔴",
@@ -473,7 +467,7 @@ class VideoEngineManager(private val context: Context) {
 
             sourceFile.copyTo(finalOutputFile, overwrite = true)
 
-            if (!VideoProcessor.isValidVideoFile(finalOutputFile.absolutePath, minSizeBytes = 15_000L)) {
+            if (!VideoProcessor.isValidVideoFile(finalOutputFile.absolutePath, minSizeBytes = VideoProcessor.MIN_OUTPUT_SIZE)) {
                 SystemLogsManager.addLog(
                     "ERROR",
                     "فشل نسخ/التحقق من الملف النهائي في مجلد التصدير 🔴",
@@ -698,7 +692,7 @@ class VideoEngineManager(private val context: Context) {
                 out.absolutePath,
                 styleAnalysis
             )
-            if (!ok || !VideoProcessor.isValidVideoFile(out.absolutePath, minSizeBytes = 5_000L)) {
+            if (!ok || !VideoProcessor.isValidVideoFile(out.absolutePath, minSizeBytes = VideoProcessor.MIN_LENIENT_SIZE)) {
                 Log.e(TAG, "generateSolidColorVideo produced invalid file for scene $index — retrying with minimal guaranteed frame")
                 // إعادة محاولة بإطار مضمون: صورة نقطية بسيطة بلا أي اعتماد خارجي
                 try {
@@ -718,7 +712,7 @@ class VideoEngineManager(private val context: Context) {
                 }
             }
             // صدق كامل: لا نجاح وهمي — احذف الملف الفاشل حتى لا يدخل سلسلة الدمج
-            if (!ok || !VideoProcessor.isValidVideoFile(out.absolutePath, minSizeBytes = 5_000L)) {
+            if (!ok || !VideoProcessor.isValidVideoFile(out.absolutePath, minSizeBytes = VideoProcessor.MIN_LENIENT_SIZE)) {
                 SystemLogsManager.addLog(
                     "ERROR",
                     "فشل توليد الإطار المحلي للمشهد $index — لن يدخل الملف الفاشل في الدمج 🔴",

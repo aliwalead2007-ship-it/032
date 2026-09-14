@@ -101,7 +101,7 @@ fun SaveShareScreen(
         logs.clear()
         val firstMedia = scenes.firstOrNull()?.mediaUrl.orEmpty()
         val alreadyRenderedFile = if (firstMedia.isNotBlank() && !firstMedia.startsWith("http")) {
-            File(firstMedia).takeIf { it.exists() && VideoProcessor.isValidVideoFile(it.absolutePath, 10_000L) }
+            File(firstMedia).takeIf { it.exists() && VideoProcessor.isValidVideoFile(it.absolutePath, VideoProcessor.MIN_SCENE_SIZE) }
         } else null
 
         if (alreadyRenderedFile != null && retryTrigger == 0 && selectedQualityOption.title.contains("1080p")) {
