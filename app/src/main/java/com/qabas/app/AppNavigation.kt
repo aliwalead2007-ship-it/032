@@ -316,7 +316,14 @@ fun AppNavigation(
         AppState.SETTINGS -> {
             SettingsScreen(
                 onLogout = {
-                    context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE).edit().clear().apply()
+                    try { com.google.firebase.auth.FirebaseAuth.getInstance().signOut() } catch (_: Exception) {}
+                    context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE).edit()
+                        .remove("is_logged_in")
+                        .remove("is_admin")
+                        .remove("is_developer")
+                        .remove("user_email")
+                        .remove("user_name")
+                        .apply()
                     viewModel.updateState { copy(appState = AppState.LOGIN) }
                 },
                 onBack = { viewModel.updateState { copy(appState = AppState.HOME) } },

@@ -351,8 +351,6 @@ fun QuranTajweedScreen(
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Icon(Icons.Default.Star, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("1,450 XP", color = GoldPrimary, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
                 },
@@ -572,14 +570,13 @@ fun QuranTajweedScreen(
                                     val fileSizeKb = (file?.length() ?: 0L) / 1024
 
                                     scope.launch {
-                                        delay(1200)
                                         isAnalyzingVoice = false
                                         lastTestScore = 0
                                         testFeedbackList = listOf(
-                                            "تم حفظ التسجيل الصوتي بنجاح (${fileSizeKb} KB)" to true,
-                                            "تحليل التجويد الحقيقي يتطلب محرك صوت متخصص (قيد التطوير)" to false
+                                            "تم حفظ التسجيل الصوتي (${fileSizeKb} KB)" to true,
+                                            "تحليل التجويد الصوتي غير متاح حالياً — حُفظ التسجيل للمراجعة اليدوية" to false
                                         )
-                                        Toast.makeText(context, "تم حفظ التسجيل. تحليل التجويد الحقيقي يتطلب محرك صوت متخصص (قيد التطوير).", Toast.LENGTH_LONG).show()
+                                        Toast.makeText(context, "تم حفظ التسجيل. تحليل التجويد غير متاح حالياً.", Toast.LENGTH_LONG).show()
                                     }
                                 }
                             )

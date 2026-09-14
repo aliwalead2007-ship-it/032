@@ -448,8 +448,8 @@ class QabasBrainViewModel(
                 Log.e(TAG, "Error in processIdeaWithBrain: ${e.message}", e)
                 val fallbackDecision = buildFallbackDecision(idea, tonePreference, targetAudience)
                 _uiState.value = _uiState.value.copy(
-                    status = BrainStatus.SUCCESS,
-                    statusMessage = "تم توليد القرار الإخراجي بالاعتماد على الهوية الأساسية الموثوقة",
+                    status = BrainStatus.ERROR,
+                    statusMessage = "تعذر الاتصال بالذكاء الاصطناعي — تم استخدام قرار احتياطي محلي",
                     currentDecision = fallbackDecision
                 )
 
