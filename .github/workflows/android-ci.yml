@@ -48,6 +48,8 @@ jobs:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          QF_CLIENT_ID: ${{ secrets.QF_CLIENT_ID }}
+          QF_CLIENT_SECRET: ${{ secrets.QF_CLIENT_SECRET }}
         run: |
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             mkdir -p app
@@ -69,6 +71,8 @@ jobs:
             echo "HUGGINGFACE_API_KEY=\"your_key\""
             echo "PEXELS_API_KEY=\"your_key\""
             echo "PIXABAY_API_KEY=\"your_key\""
+            echo "QF_CLIENT_ID=\"${QF_CLIENT_ID:-your_key}\""
+            echo "QF_CLIENT_SECRET=\"${QF_CLIENT_SECRET:-your_key}\""
           } > .env
           if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
             echo ".env written — Supabase ENABLED in built APK"
