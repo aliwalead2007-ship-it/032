@@ -382,49 +382,47 @@ fun SettingsScreen(
             ) {
                 // Dark / Light Theme Toggle
                 val isDarkTheme by ThemeManager.isDarkTheme.collectAsState()
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(Translator.tr("المظهر (Dark / Light Theme)"), color = Color.White, fontFamily = NotoSansFont, fontSize = 14.sp)
-                        Text(
-                            text = if (isDarkTheme) Translator.tr("الوضع الداكن الفاخر (قبس الأصلي)") else Translator.tr("الوضع الفاتح الأنيق"),
-                            color = Color.Gray,
-                            fontFamily = CairoFont,
-                            fontSize = 11.sp
-                        )
-                    }
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(Translator.tr("المظهر"), color = Color.White, fontFamily = NotoSansFont, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF151B2B))
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            Translator.tr("داكن 🌙"),
-                            modifier = Modifier
-                                .background(if (isDarkTheme) GoldPrimary else Color.Transparent)
-                                .clickable {
-                                    ThemeManager.setDarkTheme(context, true)
-                                }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            color = if (isDarkTheme) DeepSlate else Color.Gray,
-                            fontFamily = CairoFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            Translator.tr("فاتح ☀️"),
-                            modifier = Modifier
-                                .background(if (!isDarkTheme) GoldPrimary else Color.Transparent)
-                                .clickable {
-                                    ThemeManager.setDarkTheme(context, false)
-                                }
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                            color = if (!isDarkTheme) DeepSlate else Color.Gray,
-                            fontFamily = CairoFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        Card(
+                            modifier = Modifier.weight(1f).clickable { ThemeManager.setDarkTheme(context, true) },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDarkTheme) GoldPrimary.copy(alpha = 0.2f) else Color(0xFF151B2B)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.5.dp, if (isDarkTheme) GoldPrimary else Color(0xFF2A3040))
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.DarkMode, contentDescription = null, tint = if (isDarkTheme) GoldPrimary else Color.Gray, modifier = Modifier.size(22.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(Translator.tr("داكن"), color = if (isDarkTheme) GoldPrimary else Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = CairoFont)
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.weight(1f).clickable { ThemeManager.setDarkTheme(context, false) },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (!isDarkTheme) GoldPrimary.copy(alpha = 0.2f) else Color(0xFF151B2B)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.5.dp, if (!isDarkTheme) GoldPrimary else Color(0xFF2A3040))
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.LightMode, contentDescription = null, tint = if (!isDarkTheme) GoldPrimary else Color.Gray, modifier = Modifier.size(22.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(Translator.tr("فاتح"), color = if (!isDarkTheme) GoldPrimary else Color.Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = CairoFont)
+                            }
+                        }
                     }
                 }
 
@@ -478,35 +476,49 @@ fun SettingsScreen(
                 HorizontalDivider(color = Color(0xFF222222), modifier = Modifier.padding(vertical = 10.dp))
                 
                 // Export Quality
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Text(Translator.tr("جودة التصدير الافتراضية للفيديو"), color = Color.White, fontFamily = NotoSansFont, fontSize = 14.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF151B2B))
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text(
-                            "1080p HD",
-                            modifier = Modifier
-                                .background(if (defaultQuality == "1080p") GoldPrimary else Color.Transparent)
-                                .clickable { defaultQuality = "1080p"; prefs.edit().putString("defaultQuality", "1080p").apply() }
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            color = if (defaultQuality == "1080p") DeepSlate else Color.Gray,
-                            fontFamily = NotoSansFont,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                        Text(
-                            "4K Ultra",
-                            modifier = Modifier
-                                .background(if (defaultQuality == "4k") GoldPrimary else Color.Transparent)
-                                .clickable { defaultQuality = "4k"; prefs.edit().putString("defaultQuality", "4k").apply() }
-                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                            color = if (defaultQuality == "4k") DeepSlate else Color.Gray,
-                            fontFamily = NotoSansFont,
-                            fontWeight = FontWeight.Bold,
+                        Card(
+                            modifier = Modifier.weight(1f).clickable { defaultQuality = "1080p"; prefs.edit().putString("defaultQuality", "1080p").apply() },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (defaultQuality == "1080p") GoldPrimary.copy(alpha = 0.2f) else Color(0xFF151B2B)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.5.dp, if (defaultQuality == "1080p") GoldPrimary else Color(0xFF2A3040))
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("HD", color = if (defaultQuality == "1080p") GoldPrimary else Color.Gray, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = NotoSansFont)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(Translator.tr("سريع ⚡"), color = if (defaultQuality == "1080p") GoldPrimary else Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = CairoFont)
+                            }
+                        }
+                        Card(
+                            modifier = Modifier.weight(1f).clickable { defaultQuality = "4k"; prefs.edit().putString("defaultQuality", "4k").apply() },
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (defaultQuality == "4k") GoldPrimary.copy(alpha = 0.2f) else Color(0xFF151B2B)
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.5.dp, if (defaultQuality == "4k") GoldPrimary else Color(0xFF2A3040))
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("4K", color = if (defaultQuality == "4k") GoldPrimary else Color.Gray, fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = NotoSansFont)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(Translator.tr("أفضل جودة 👁️‍🗨️"), color = if (defaultQuality == "4k") GoldPrimary else Color.Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, fontFamily = CairoFont)
+                            }
+                        }
+                    }
+                }
                             fontSize = 12.sp
                         )
                     }

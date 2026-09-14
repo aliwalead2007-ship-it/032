@@ -5,8 +5,10 @@ import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.*
@@ -66,6 +68,14 @@ private val LightColorScheme = lightColorScheme(
     onSurface = LightTextPrimary
 )
 
+private val QabasShapes = Shapes(
+    extraSmall = RoundedCornerShape(4.dp),
+    small = RoundedCornerShape(8.dp),
+    medium = RoundedCornerShape(12.dp),
+    large = RoundedCornerShape(16.dp),
+    extraLarge = RoundedCornerShape(24.dp)
+)
+
 @Composable
 fun animateColorScheme(targetColorScheme: ColorScheme): ColorScheme {
     val animationSpec = tween<Color>(durationMillis = 400)
@@ -116,6 +126,7 @@ fun MyApplicationTheme(
     MaterialTheme(
         colorScheme = animatedColorScheme,
         typography = Typography,
+        shapes = QabasShapes,
         content = content
     )
 }

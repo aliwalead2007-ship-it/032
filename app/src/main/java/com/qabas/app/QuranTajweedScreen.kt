@@ -340,19 +340,6 @@ fun QuranTajweedScreen(
                     }
                 },
                 actions = {
-                    Surface(
-                        color = GoldPrimary.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f)),
-                        modifier = Modifier.padding(end = 12.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = GoldPrimary, modifier = Modifier.size(14.dp))
-                        }
-                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DeepSlate)
             )

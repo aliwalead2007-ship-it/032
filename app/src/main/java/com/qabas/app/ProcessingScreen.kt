@@ -661,6 +661,23 @@ private fun ProcessingScreenUI(
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Button(
+                            onClick = { if (isActive) onProcessingComplete(processedScenes) },
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = DeepSlate, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                Translator.tr("عرض الفيديو ومشاركته"),
+                                color = DeepSlate,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = CairoFont
+                            )
+                        }
                     }
                 }
             }
@@ -714,9 +731,17 @@ private fun ProcessingScreenUI(
                         }
                         Spacer(modifier = Modifier.height(8.dp))
                         activityLog.take(10).forEach { line ->
+                            val lineColor = when {
+                                line.contains("✅") || line.contains("نجاح") || line.contains("تم") -> Color(0xFF10B981)
+                                line.contains("❌") || line.contains("فشل") || line.contains("خطأ") -> Color(0xFFEF4444)
+                                line.contains("⚠️") || line.contains("تحذير") -> Color(0xFFF59E0B)
+                                line.contains("Gemini") || line.contains("توليد") || line.contains("StyleBrain") -> GoldPrimary
+                                line.contains("FFmpeg") || line.contains("محرك") -> AiCyan
+                                else -> Color.White.copy(alpha = 0.72f)
+                            }
                             Text(
                                 line,
-                                color = Color.White.copy(alpha = 0.72f),
+                                color = lineColor,
                                 fontSize = 11.sp,
                                 fontFamily = CairoFont,
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)

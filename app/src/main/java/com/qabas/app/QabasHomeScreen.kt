@@ -225,24 +225,24 @@ fun HomeScreen(
                         Icon(
                             if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
                             contentDescription = Translator.tr("تبديل المظهر"),
-                            tint = AiCyan
+                            tint = if (isDarkTheme) GoldPrimary else AiCyan
                         )
                     }
                     IconButton(onClick = onViewNotifications) {
                         BadgedBox(
                             badge = { if (notifCount > 0) Badge { Text("$notifCount") } }
                         ) {
-                            Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = AiCyan)
+                            Icon(Icons.Default.Notifications, contentDescription = "الإشعارات", tint = if (notifCount > 0) GoldPrimary else TextSecondary)
                         }
                     }
                     IconButton(onClick = onLeaderboard) {
-                        Icon(Icons.Default.EmojiEvents, contentDescription = Translator.tr("لوحة الشرف"), tint = AiCyan)
+                        Icon(Icons.Default.EmojiEvents, contentDescription = Translator.tr("لوحة الشرف"), tint = TextSecondary)
                     }
                     IconButton(onClick = onViewSettings) {
                         Icon(Icons.Default.Settings, contentDescription = Translator.tr("الإعدادات"), tint = TextSecondary)
                     }
                     IconButton(onClick = onViewProfile) {
-                        Icon(Icons.Default.AccountCircle, contentDescription = Translator.tr("الملف الشخصي"), tint = AiCyan)
+                        Icon(Icons.Default.AccountCircle, contentDescription = Translator.tr("الملف الشخصي"), tint = TextSecondary)
                     }
                     Spacer(modifier = Modifier.width(4.dp))
                 },
