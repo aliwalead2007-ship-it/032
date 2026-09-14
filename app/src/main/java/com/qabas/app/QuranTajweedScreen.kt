@@ -143,6 +143,7 @@ fun QuranTajweedScreen(
     // State for selected Surah in Golden Quran Reader
     var activeSurahId by remember { mutableIntStateOf(qabasPrefs.getInt("last_read_surah", 1)) }
     var isReadingMode by remember { mutableStateOf(false) }
+    var isPageReaderMode by remember { mutableStateOf(false) } // قارئ الصفحات الـ 604 (مصحف المدينة)
     var readerTargetVerseNumber by remember { mutableIntStateOf(-1) }
     var isPlayingAudio by remember { mutableStateOf(false) }
     var selectedReciter by remember { mutableStateOf(qabasPrefs.getString("selected_reciter", "الشيخ محمود خليل الحصري") ?: "الشيخ محمود خليل الحصري") }
@@ -375,27 +376,27 @@ fun QuranTajweedScreen(
             ) {
                 Tab(
                     selected = quranSection == 0,
-                    onClick = { quranSection = 0; isReadingMode = false; showTafseerDialog = null },
+                    onClick = { quranSection = 0; isReadingMode = false; isPageReaderMode = false; showTafseerDialog = null },
                     text = { Text("المصحف الشريف 📖", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = quranSection == 1,
-                    onClick = { quranSection = 1; isReadingMode = false; showTafseerDialog = null },
+                    onClick = { quranSection = 1; isReadingMode = false; isPageReaderMode = false; showTafseerDialog = null },
                     text = { Text("القراء والروايات 🎙️", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = quranSection == 2,
-                    onClick = { quranSection = 2; isReadingMode = false; showTafseerDialog = null },
+                    onClick = { quranSection = 2; isReadingMode = false; isPageReaderMode = false; showTafseerDialog = null },
                     text = { Text("التفسير والمصادر 📚", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = quranSection == 3,
-                    onClick = { quranSection = 3; isReadingMode = false; showTafseerDialog = null },
+                    onClick = { quranSection = 3; isReadingMode = false; isPageReaderMode = false; showTafseerDialog = null },
                     text = { Text("الأذكار 🤲", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
                 Tab(
                     selected = quranSection == 4,
-                    onClick = { quranSection = 4; isReadingMode = false; showTafseerDialog = null },
+                    onClick = { quranSection = 4; isReadingMode = false; isPageReaderMode = false; showTafseerDialog = null },
                     text = { Text("أكاديمية التجويد 🎓", fontFamily = CairoFont, fontWeight = FontWeight.Bold) }
                 )
             }
@@ -404,7 +405,11 @@ fun QuranTajweedScreen(
 
             when (quranSection) {
                 0 -> {
-                    if (isReadingMode) {
+                    if (isPageReaderMode) {
+                        MushafReaderScreen(
+                            onClose = { isPageReaderMode = false }
+                        )
+                    } else if (isReadingMode) {
                         val activeSurah = surahList.find { it.id == activeSurahId } ?: surahList[0]
                         GoldenMushafReaderView(
                             surah = activeSurah,
@@ -426,6 +431,33 @@ fun QuranTajweedScreen(
                         )
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
+                            // دخول قارئ الصفحات (604 — مصحف المدينة): تصميم أصلي لقبس
+                            val lastPage = qabasPrefs.getInt("last_read_page", 1)
+                            Card(
+                                modifier = Modifier.fillMaxWidth().clickable { isPageReaderMode = true },
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF151B2B)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary)
+                            ) {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(
+                                            "📖 المصحف بالصفحات",
+                                            color = Color.White, fontFamily = CairoFont,
+                                            fontWeight = FontWeight.Bold, fontSize = 16.sp
+                                        )
+                                        Text(
+                                            "تصفح الـ ٦٠٤ صفحات بالسحب — آخر صفحة: ${lastPage}",
+                                            color = TextSecondary, fontFamily = CairoFont, fontSize = 12.sp
+                                        )
+                                    }
+                                    Text("‹", color = GoldPrimary, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
                             val lastReadSurah = surahList.find { it.id == activeSurahId }
                             if (lastReadSurah != null) {
                                 GoldenContinueReadingCard(

@@ -204,6 +204,16 @@ object QuranDataProvider {
     }
 
     /**
+     * نص آية محددة من الذاكرة المحملة (يُستخدم في قارئ الصفحات).
+     * يُرجع null عند غياب التحميل — لا نص ملفّق.
+     */
+    fun getVerseText(surahId: Int, ayah: Int): String? =
+        versesMap?.get(surahId)?.firstOrNull { it.ayah == ayah }?.text
+
+    /** اسم السورة علناً (يُستخدم في قارئ الصفحات). */
+    fun surahNameOf(surahId: Int): String = getSurahName(surahId)
+
+    /**
      * قائمة الـ 114 سورة كاملة موثقة بالترتيب والتفاصيل
      */
     val surahs: List<QuranSurahItem> by lazy {
