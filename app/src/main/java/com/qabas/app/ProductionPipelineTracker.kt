@@ -36,7 +36,9 @@ object ProductionPipelineTracker {
         val result: Result,
         val message: String,
         val detail: String = "",
-        val durationMs: Long = 0
+        val durationMs: Long = 0,
+        val runId: String = "",
+        val sceneIndex: Int = -1
     ) {
         fun toJson(): JSONObject = JSONObject().apply {
             put("ts", timestamp)
@@ -45,6 +47,8 @@ object ProductionPipelineTracker {
             put("msg", message)
             put("detail", detail)
             put("dur", durationMs)
+            put("runId", runId)
+            put("sceneIndex", sceneIndex)
         }
 
         companion object {
@@ -54,7 +58,9 @@ object ProductionPipelineTracker {
                 result = try { Result.valueOf(j.optString("result", "")) } catch (_: Exception) { Result.FAILURE },
                 message = j.optString("msg", ""),
                 detail = j.optString("detail", ""),
-                durationMs = j.optLong("dur", 0)
+                durationMs = j.optLong("dur", 0),
+                runId = j.optString("runId", ""),
+                sceneIndex = j.optInt("sceneIndex", -1)
             )
         }
     }
@@ -65,9 +71,11 @@ object ProductionPipelineTracker {
         result: Result,
         message: String,
         detail: String = "",
-        durationMs: Long = 0
+        durationMs: Long = 0,
+        runId: String = "",
+        sceneIndex: Int = -1
     ) {
-        val event = PipelineEvent(System.currentTimeMillis(), stage, result, message, detail, durationMs)
+        val event = PipelineEvent(System.currentTimeMillis(), stage, result, message, detail, durationMs, runId, sceneIndex)
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val arr = try {
             JSONArray(prefs.getString(KEY_EVENTS, "[]") ?: "[]")

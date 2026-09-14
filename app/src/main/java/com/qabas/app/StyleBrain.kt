@@ -1674,6 +1674,18 @@ object StyleBrain {
             "إبراز الكلمات المفتاحية باللون الذهبي"
         )
         val summaryAnalysis = "${analysisResult.detectedStyle.ifEmpty { name }} | ${analysisResult.contentTone} | ألوان: ${analysisResult.dominantColors} | حركة: ${analysisResult.transitionSpeed}"
+        val populatedAnalysisFields = listOf(
+            analysisResult.detectedStyle,
+            analysisResult.dominantColors,
+            analysisResult.transitionSpeed,
+            analysisResult.movementPatterns,
+            analysisResult.overallRhythm,
+            analysisResult.audioStyle,
+            analysisResult.typographyStyle,
+            analysisResult.contentTone,
+            analysisResult.targetAudience
+        ).count { it.isNotBlank() }
+        val analysisScore = (populatedAnalysisFields * 100 / 9).coerceIn(0, 100)
         
         val newStyle = AbsorbedStyle(
             id = UUID.randomUUID().toString(),
@@ -1683,7 +1695,7 @@ object StyleBrain {
             visualTraits = visualTraits.filter { it.isNotBlank() },
             motionTraits = motionTraits.filter { it.isNotBlank() },
             textTraits = textTraits.filter { it.isNotBlank() },
-            overallScore = (90..98).random(),
+            overallScore = analysisScore,
             absorbedAt = System.currentTimeMillis()
         )
         
@@ -2521,5 +2533,4 @@ object StyleBrain {
         }
     }
 }
-
 

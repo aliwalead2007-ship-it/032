@@ -28,7 +28,9 @@ fun ProductionPipelineSection(
 ) {
     val context = LocalContext.current
     val events = remember { mutableStateOf(ProductionPipelineTracker.getEvents(context)) }
-    val stats = remember { ProductionPipelineTracker.getStageStats(context) }
+    val stats = remember(events.value) {
+        ProductionPipelineTracker.getStageStats(context)
+    }
     var selectedStage by remember { mutableStateOf<ProductionPipelineTracker.Stage?>(null) }
 
     val filteredEvents = if (selectedStage != null) events.value.filter { it.stage == selectedStage } else events.value

@@ -60,6 +60,7 @@ fun ProcessingScreen(
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
+    val pipelineRunId = remember { java.util.UUID.randomUUID().toString() }
     val prefs = remember(context) {
         context.getSharedPreferences("qabas_prefs", android.content.Context.MODE_PRIVATE)
     }
@@ -149,6 +150,18 @@ fun ProcessingScreen(
             val durationSecs = videoDuration.filter { it.isDigit() }.toIntOrNull() ?: if (contentType.contains("Reels") || contentType.contains("Shorts") || contentType.contains("ريلز") || contentType.contains("قصير")) 15 else 30
             val duration = durationSecs
             val directStyle = videoStyleAnalysis?.let { a ->
+                val populatedAnalysisFields = listOf(
+                    a.detectedStyle,
+                    a.dominantColors,
+                    a.transitionSpeed,
+                    a.movementPatterns,
+                    a.overallRhythm,
+                    a.audioStyle,
+                    a.typographyStyle,
+                    a.contentTone,
+                    a.targetAudience
+                ).count { it.isNotBlank() }
+                val analysisScore = (populatedAnalysisFields * 100 / 9).coerceIn(0, 100)
                 AbsorbedStyle(
                     id = "direct_applied",
                     name = a.detectedStyle.ifEmpty { "الأسلوب المستنسخ المباشر" },
@@ -160,7 +173,7 @@ fun ProcessingScreen(
                         a.movementPatterns.ifEmpty { "حركة كاميرا زووم بطيء ناعم" }
                     ),
                     textTraits = listOf(a.typographyStyle.ifEmpty { "خط عربي عريض في المنتصف" }),
-                    overallScore = 98
+                    overallScore = analysisScore
                 )
             }
 
@@ -171,11 +184,11 @@ fun ProcessingScreen(
             } catch (e: Exception) {
                 Log.w("ProcessingScreen", "StyleBrain choose failed", e)
                 pushActivity("StyleBrain: فشل — استخدام الافتراضي")
-                ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.STYLE_SELECTION, ProductionPipelineTracker.Result.FALLBACK, "StyleBrain فشل — استخدام الافتراضي", e.message ?: "", System.currentTimeMillis() - styleStartMs)
+                ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.STYLE_SELECTION, ProductionPipelineTracker.Result.FALLBACK, "StyleBrain فشل — استخدام الافتراضي", e.message ?: "", System.currentTimeMillis() - styleStartMs, pipelineRunId)
                 directStyle
             }
             val effectiveStyle = bestStyle ?: StyleBrain.getDefaultStyle()
-            ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.STYLE_SELECTION, if (bestStyle != null) ProductionPipelineTracker.Result.SUCCESS else ProductionPipelineTracker.Result.FALLBACK, if (bestStyle != null) "أسلوب مختار: ${bestStyle.name}" else "الأسلوب الافتراضي (العقل فارغ)", "", System.currentTimeMillis() - styleStartMs)
+            ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.STYLE_SELECTION, if (bestStyle != null) ProductionPipelineTracker.Result.SUCCESS else ProductionPipelineTracker.Result.FALLBACK, if (bestStyle != null) "أسلوب مختار: ${bestStyle.name}" else "الأسلوب الافتراضي (العقل فارغ)", "", System.currentTimeMillis() - styleStartMs, pipelineRunId)
             val effectiveStyleAnalysisFromStyle = videoStyleAnalysis ?: effectiveStyle.toVideoStyleAnalysis()
 
             val effectiveColors = if (effectiveStyle.visualTraits.isNotEmpty()) {
@@ -232,18 +245,18 @@ fun ProcessingScreen(
                     )
                     if (directed.isNotEmpty()) {
                         SystemLogsManager.addLog("DIRECTOR", "خطة المخرج: ${directed.size} مشاهد", Color(0xFF4CAF50))
-                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.SCRIPT_GENERATION, ProductionPipelineTracker.Result.SUCCESS, "خطة المخرج: ${directed.size} مشاهد", "", System.currentTimeMillis() - scriptStartMs)
+                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.SCRIPT_GENERATION, ProductionPipelineTracker.Result.SUCCESS, "خطة المخرج: ${directed.size} مشاهد", "", System.currentTimeMillis() - scriptStartMs, pipelineRunId)
                         directed
                     } else {
                         val fallbackScenes = AppServices.generateScript(inputText, finalStyleDescription, contentType, contentTone)
-                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.SCRIPT_GENERATION, ProductionPipelineTracker.Result.FALLBACK, "Gemini بديل: ${fallbackScenes.size} مشاهد", "MontageDirector أرجع فارغ", System.currentTimeMillis() - scriptStartMs)
+                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.SCRIPT_GENERATION, ProductionPipelineTracker.Result.FALLBACK, "Gemini بديل: ${fallbackScenes.size} مشاهد", "MontageDirector أرجع فارغ", System.currentTimeMillis() - scriptStartMs, pipelineRunId)
                         fallbackScenes
                     }
                 } catch (dirEx: Exception) {
                     if (dirEx is CancellationException) throw dirEx
                     Log.w("ProcessingScreen", "MontageDirector failed", dirEx)
                     val fallbackScenes = AppServices.generateScript(inputText, finalStyleDescription, contentType, contentTone)
-                    ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.SCRIPT_GENERATION, ProductionPipelineTracker.Result.FALLBACK, "Gemini بديل بعد فشل Director: ${fallbackScenes.size} مشاهد", dirEx.message ?: "", System.currentTimeMillis() - scriptStartMs)
+                    ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.SCRIPT_GENERATION, ProductionPipelineTracker.Result.FALLBACK, "Gemini بديل بعد فشل Director: ${fallbackScenes.size} مشاهد", dirEx.message ?: "", System.currentTimeMillis() - scriptStartMs, pipelineRunId)
                     fallbackScenes
                 }
             }
@@ -302,7 +315,7 @@ fun ProcessingScreen(
                     try {
                         val media = AppServices.fetchMedia(scene.description)
                         finalMedia = if (media.isNotEmpty()) {
-                            ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.BROLL_FETCH, ProductionPipelineTracker.Result.SUCCESS, "مشهد ${index + 1}: جلب وسائط ناجح", scene.description.take(60), System.currentTimeMillis() - sceneStartMs)
+                            ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.BROLL_FETCH, ProductionPipelineTracker.Result.SUCCESS, "مشهد ${index + 1}: جلب وسائط ناجح", scene.description.take(60), System.currentTimeMillis() - sceneStartMs, pipelineRunId, index)
                             media
                         } else {
                             val genVideo = AppServices.generateVideo(
@@ -314,13 +327,13 @@ fun ProcessingScreen(
                                 textAnim = effectiveTextAnim,
                                 visualEffect = scene.visualEffect
                             )
-                            ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.BROLL_FETCH, if (genVideo.isNotEmpty()) ProductionPipelineTracker.Result.SUCCESS else ProductionPipelineTracker.Result.FAILURE, "مشهد ${index + 1}: ${if (genVideo.isNotEmpty()) "توليد بديل" else "فشل جلب + توليد"}", scene.description.take(60), System.currentTimeMillis() - sceneStartMs)
+                            ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.BROLL_FETCH, if (genVideo.isNotEmpty()) ProductionPipelineTracker.Result.FALLBACK else ProductionPipelineTracker.Result.FAILURE, "مشهد ${index + 1}: ${if (genVideo.isNotEmpty()) "توليد بديل" else "فشل جلب + توليد"}", scene.description.take(60), System.currentTimeMillis() - sceneStartMs, pipelineRunId, index)
                             genVideo
                         }
                     } catch (sceneEx: Exception) {
                         if (sceneEx is CancellationException) throw sceneEx
                         Log.e("ProcessingScreen", "Error scene $index", sceneEx)
-                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.BROLL_FETCH, ProductionPipelineTracker.Result.FAILURE, "مشهد ${index + 1}: خطأ في الجلب", sceneEx.message ?: "", System.currentTimeMillis() - sceneStartMs)
+                        ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.BROLL_FETCH, ProductionPipelineTracker.Result.FAILURE, "مشهد ${index + 1}: خطأ في الجلب", sceneEx.message ?: "", System.currentTimeMillis() - sceneStartMs, pipelineRunId, index)
                     }
                 }
                 withContext(Dispatchers.Main) {
@@ -365,7 +378,6 @@ fun ProcessingScreen(
 
             if (ambientSound != Translator.tr("بدون") && ambientSound.isNotBlank()) {
                 statusText = Translator.tr("دمج الصوت المحيطي: $ambientSound...")
-                progress = 0.82f
                 pushActivity("دمج صوت: $ambientSound")
             }
 
@@ -413,6 +425,7 @@ fun ProcessingScreen(
                             videoQuality = videoQuality,
                             ambientSound = ambientSound,
                             styleAnalysis = effectiveStyleAnalysisFromStyle,
+                            runId = pipelineRunId,
                             onProgress = { p, msg ->
                                 val overallProg = (0.88f + p * 0.10f).coerceIn(0.88f, 0.98f)
                                 progress = overallProg
@@ -431,7 +444,7 @@ fun ProcessingScreen(
                 if (finalProducedFile != null && VideoProcessor.isValidVideoFile(finalProducedFile.absolutePath)) {
                     pushActivity("تصدير ناجح: ${finalProducedFile.name}")
                     SystemLogsManager.addLog("SUCCESS", "تم إنتاج الفيديو (${finalProducedFile.name})", Color(0xFF4CAF50))
-                    ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.EXPORT, ProductionPipelineTracker.Result.SUCCESS, "تصدير ناجح: ${finalProducedFile.name}", "${processedScenes.size} مشاهد | $videoQuality", engineDurationMs)
+                    ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.EXPORT, ProductionPipelineTracker.Result.SUCCESS, "تصدير ناجح: ${finalProducedFile.name}", "${processedScenes.size} مشاهد | $videoQuality", engineDurationMs, pipelineRunId)
                     try { 
                         StyleBrain.recordProductionResult(context, effectiveStyle.id, success = true)
                         ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.STYLE_FEEDBACK, ProductionPipelineTracker.Result.SUCCESS, "تغذية راجعة: نجاح الأسلوب ${effectiveStyle.id}", "", 0)
@@ -445,7 +458,7 @@ fun ProcessingScreen(
                     isFailed = true
                     pushActivity("تحذير: التصدير لم يكتمل")
                     SystemLogsManager.addLog("ERROR", "فشل إنتاج الفيديو النهائي أو الملف غير موجود", Color(0xFFEF4444))
-                    ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.EXPORT, ProductionPipelineTracker.Result.FAILURE, "فشل التصدير — ملف غير صالح أو غير موجود", finalProducedFile?.name ?: "لا ملف", engineDurationMs)
+                    ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.EXPORT, ProductionPipelineTracker.Result.FAILURE, "فشل التصدير — ملف غير صالح أو غير موجود", finalProducedFile?.name ?: "لا ملف", engineDurationMs, pipelineRunId)
                     try { StyleBrain.recordProductionResult(context, effectiveStyle.id, success = false) } catch (_: Exception) {}
                     statusText = Translator.tr("تعذر إكمال التصدير — لا يوجد ملف فيديو صالح")
                 }
@@ -455,7 +468,7 @@ fun ProcessingScreen(
                 pushActivity("خطأ: ${e.localizedMessage ?: e.message}")
                 SystemLogsManager.addLog("ERROR", "فشل التجميع: ${e.message}", Color(0xFFEF4444))
                 val isTimeout = e is kotlinx.coroutines.TimeoutCancellationException
-                ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.VIDEO_ENGINE, if (isTimeout) ProductionPipelineTracker.Result.TIMEOUT else ProductionPipelineTracker.Result.FAILURE, if (isTimeout) "مهلة المحرك انتهت" else "خطأ في محرك الفيديو", e.message ?: "", 0)
+                ProductionPipelineTracker.record(context, ProductionPipelineTracker.Stage.VIDEO_ENGINE, if (isTimeout) ProductionPipelineTracker.Result.TIMEOUT else ProductionPipelineTracker.Result.FAILURE, if (isTimeout) "مهلة المحرك انتهت" else "خطأ في محرك الفيديو", e.message ?: "", 0, pipelineRunId)
                 statusText = Translator.tr("حدث خطأ في الإنتاج النهائي")
             }
 
