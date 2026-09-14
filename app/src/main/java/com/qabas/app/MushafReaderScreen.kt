@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -61,6 +62,7 @@ import kotlinx.coroutines.withContext
 private const val PREFS = "qabas_prefs"
 private const val KEY_LAST_PAGE = "last_read_page"
 private const val KEY_BOOKMARKS = "mushaf_bookmarks"
+private const val KEY_FONT_SIZE = "mushaf_font_size"
 
 private fun easternDigits(n: Int): String {
     val eastern = charArrayOf('٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩')
@@ -82,6 +84,7 @@ fun MushafReaderScreen(
     var bookmarks by remember {
         mutableStateOf(prefs.getStringSet(KEY_BOOKMARKS, emptySet())?.mapNotNull { it.toIntOrNull() }?.sorted() ?: emptyList())
     }
+    var fontScale by remember { mutableFloatStateOf(prefs.getFloat(KEY_FONT_SIZE, 1f)) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -118,6 +121,11 @@ fun MushafReaderScreen(
                     prefs.edit().putStringSet(KEY_BOOKMARKS, updated.map { it.toString() }.toSet()).apply()
                 },
                 onSavePage = { page -> prefs.edit().putInt(KEY_LAST_PAGE, page).apply() },
+                fontScale = fontScale,
+                onFontScaleChange = { v ->
+                    fontScale = v
+                    prefs.edit().putFloat(KEY_FONT_SIZE, v).apply()
+                },
                 onClose = {
                     onClose()
                 },
@@ -133,6 +141,8 @@ private fun MushafReaderContent(
     bookmarks: List<Int>,
     onBookmarksChange: (List<Int>) -> Unit,
     onSavePage: (Int) -> Unit,
+    fontScale: Float,
+    onFontScaleChange: (Float) -> Unit,
     onClose: () -> Unit,
     onOpenTafseer: (Int, Int) -> Unit
 ) {
@@ -152,6 +162,10 @@ private fun MushafReaderContent(
     val hizb = remember(currentPage) { MushafPageData.getHizbForPage(currentPage) }
     val isBookmarked = currentPage in bookmarks
     var showSheet by remember { mutableStateOf(false) }
+    // أول آية ظاهرة في الصفحة الحالية (شارة «آية X»)
+    var visibleAyah by remember(currentPage) {
+        mutableIntStateOf(MushafPageData.getPageRefs(currentPage).firstOrNull()?.second ?: 1)
+    }
 
     fun toggleBookmark() {
         val updated = if (isBookmarked) bookmarks - currentPage else (bookmarks + currentPage).sorted()
@@ -179,7 +193,14 @@ private fun MushafReaderContent(
                 state = pagerState,
                 modifier = Modifier.weight(1f).fillMaxWidth()
             ) { index ->
-                MushafPageCard(page = index + 1, onOpenTafseer = onOpenTafseer)
+                MushafPageCard(
+                    page = index + 1,
+                    fontScale = fontScale,
+                    onVisibleAyah = { _, ayah ->
+                        if (index + 1 == pagerState.currentPage + 1) visibleAyah = ayah
+                    },
+                    onOpenTafseer = onOpenTafseer
+                )
             }
             // ── الشريط السفلي: رقم الصفحة + التحكم ──
             MushafBottomBar(
@@ -198,6 +219,12 @@ private fun MushafReaderContent(
                 currentPage = currentPage,
                 surahName = surahsOnPage.firstOrNull()?.let { QuranDataProvider.surahNameOf(it) } ?: "المصحف الشريف",
                 hizb = hizb,
+                visibleAyah = visibleAyah,
+                fontScale = fontScale,
+                onFontScaleChange = onFontScaleChange,
+                onAudioClick = {
+                    Toast.makeText(context, "التلاوة الصوتية عبر الإنترنت قيد التجهيز — اختر قارئك من قسم «القراء والروايات»", Toast.LENGTH_SHORT).show()
+                },
                 onGoToPage = { page ->
                     showSheet = false
                     scope.launch { pagerState.scrollToPage((page - 1).coerceIn(0, MushafPageData.PAGE_COUNT - 1)) }
@@ -255,56 +282,109 @@ private fun MushafTopBar(surahNames: List<String>, juz: Int, hizb: Int, onClose:
 }
 
 @Composable
-private fun MushafPageCard(page: Int, onOpenTafseer: (Int, Int) -> Unit) {
+private fun MushafPageCard(
+    page: Int,
+    fontScale: Float,
+    onVisibleAyah: (surahId: Int, ayah: Int) -> Unit,
+    onOpenTafseer: (Int, Int) -> Unit
+) {
     val refs = remember(page) { MushafPageData.getPageRefs(page) }
-    val scroll = rememberScrollState()
+    // عناصر العرض: رأس سورة عند بدايتها + آية آية (لتتبع الظاهر منها)
+    val items = remember(page) {
+        val list = ArrayList<MushafLineItem>()
+        var lastSurah = -1
+        for ((s, a) in refs) {
+            if (a == 1 && s != lastSurah) {
+                list.add(MushafLineItem.Header(s))
+                lastSurah = s
+            }
+            list.add(MushafLineItem.Ayah(s, a))
+        }
+        list
+    }
+    val listState = remember(page) { androidx.compose.foundation.lazy.LazyListState() }
+    // الإبلاغ عن أول آية ظاهرة (شارة «آية X»)
+    LaunchedEffect(page, listState.firstVisibleItemIndex) {
+        val idx = listState.firstVisibleItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+        if (items.isNotEmpty()) {
+            when (val it = items[idx]) {
+                is MushafLineItem.Ayah -> onVisibleAyah(it.surah, it.ayah)
+                is MushafLineItem.Header -> onVisibleAyah(it.surah, 1)
+            }
+        }
+    }
     Box(
         Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 8.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFFFFFEF7))
             .border(1.dp, GoldPrimary, RoundedCornerShape(16.dp))
-            .padding(horizontal = 18.dp, vertical = 16.dp)
+            .padding(horizontal = 18.dp, vertical = 12.dp)
     ) {
-        if (refs.isEmpty()) {
+        if (items.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("لا تتوفر بيانات هذه الصفحة", color = Color.Gray, fontFamily = CairoFont)
             }
             return@Box
         }
-        val pageText = remember(page) {
-            buildAnnotatedString {
-                var lastSurah = -1
-                for ((s, a) in refs) {
-                    if (a == 1 && s != lastSurah) {
-                        // رأس سورة جديدة تبدأ في هذه الصفحة
-                        pushStyle(
-                            androidx.compose.ui.text.SpanStyle(
-                                color = Color(0xFF8B5CF6), fontWeight = FontWeight.Bold
-                            )
-                        )
-                        append("\nسورة ${QuranDataProvider.surahNameOf(s)}\n")
-                        pop()
-                        if (s != 9) {
-                            append("بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ\n")
-                        }
-                        lastSurah = s
+        val fontSize = (21 * fontScale).sp
+        val lineH = (40 * fontScale).sp
+        androidx.compose.foundation.lazy.LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            items(
+                count = items.size,
+                key = { i ->
+                    when (val it = items[i]) {
+                        is MushafLineItem.Header -> "h-${it.surah}"
+                        is MushafLineItem.Ayah -> "a-${it.surah}-${it.ayah}"
                     }
-                    val text = QuranDataProvider.getVerseText(s, a) ?: ""
-                    append(text)
-                    append(" ﴿${easternDigits(a)}﴾ ")
+                }
+            ) { i ->
+                when (val it = items[i]) {
+                    is MushafLineItem.Header -> {
+                        Column(
+                            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "سورة ${QuranDataProvider.surahNameOf(it.surah)}",
+                                color = Color(0xFF8B5CF6), fontFamily = AmiriFont,
+                                fontWeight = FontWeight.Bold, fontSize = fontSize,
+                                textAlign = TextAlign.Center
+                            )
+                            if (it.surah != 9) {
+                                Text(
+                                    "بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ",
+                                    color = Color(0xFF1A1A1A), fontFamily = AmiriFont,
+                                    fontSize = fontSize, textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                    is MushafLineItem.Ayah -> {
+                        Text(
+                            buildAnnotatedString {
+                                append(QuranDataProvider.getVerseText(it.surah, it.ayah) ?: "")
+                                append(" ﴿${easternDigits(it.ayah)}﴾ ")
+                            },
+                            fontFamily = AmiriFont,
+                            fontSize = fontSize,
+                            lineHeight = lineH,
+                            color = Color(0xFF1A1A1A),
+                            textAlign = TextAlign.Justify,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        )
+                    }
                 }
             }
         }
-        Text(
-            text = pageText,
-            modifier = Modifier.fillMaxSize().verticalScroll(scroll),
-            fontFamily = AmiriFont,
-            fontSize = 21.sp,
-            lineHeight = 40.sp,
-            color = Color(0xFF1A1A1A),
-            textAlign = TextAlign.Justify
-        )
     }
+}
+
+private sealed interface MushafLineItem {
+    data class Header(val surah: Int) : MushafLineItem
+    data class Ayah(val surah: Int, val ayah: Int) : MushafLineItem
 }
 
 @Composable
@@ -359,6 +439,10 @@ private fun MushafPageSheet(
     currentPage: Int,
     surahName: String,
     hizb: Int,
+    visibleAyah: Int,
+    fontScale: Float,
+    onFontScaleChange: (Float) -> Unit,
+    onAudioClick: () -> Unit,
     onGoToPage: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -375,6 +459,18 @@ private fun MushafPageSheet(
                     if (hizb > 0) "الحزب ${easternDigits(hizb)}" else "",
                     color = TextSecondary, fontFamily = CairoFont, fontSize = 13.sp
                 )
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = GoldPrimary.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        "آية ${easternDigits(visibleAyah)}",
+                        color = GoldPrimary, fontFamily = CairoFont,
+                        fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    )
+                }
                 Text(
                     surahName,
                     color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 16.sp
@@ -420,6 +516,21 @@ private fun MushafPageSheet(
                             )
                         }
                     }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onAudioClick) {
+                    Icon(Icons.Default.Headset, contentDescription = "التلاوة الصوتية", tint = GoldPrimary)
+                }
+                Text("أ", color = TextSecondary, fontFamily = CairoFont, fontSize = 14.sp)
+                Slider(
+                    value = fontScale,
+                    onValueChange = onFontScaleChange,
+                    valueRange = 0.8f..1.6f,
+                    modifier = Modifier.weight(1f),
+                    colors = SliderDefaults.colors(thumbColor = GoldPrimary, activeTrackColor = GoldPrimary)
+                )
+                Text("أ", color = Color.White, fontFamily = CairoFont, fontWeight = FontWeight.Bold, fontSize = 22.sp)
             }
             Spacer(Modifier.height(20.dp))
         }
