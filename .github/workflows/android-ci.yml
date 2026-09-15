@@ -168,17 +168,14 @@ jobs:
           fi
 
           # ── ارفع كـ GitHub Release ──
-          RELEASE_NOTES="📦 Qabas $VERSION ($VERSION_CODE)
-_APK: $APK_SIZE_"
+          RELEASE_NOTES="Qabas $VERSION ($VERSION_CODE) | APK: $APK_SIZE"
 
           if [ "$IS_DELTA" = "true" ]; then
             PATCH_SIZE=$(du -h "$PATCH_FILE" | cut -f1)
-            RELEASE_NOTES="${RELEASE_NOTES}
-🔄 Delta patch: $PATCH_SIZE (تحديث فرق فقط)"
+            RELEASE_NOTES="$RELEASE_NOTES | Delta: $PATCH_SIZE"
           fi
 
-          RELEASE_NOTES="${RELEASE_NOTES}
-🔗 للتحديث: نزّل ملف .delta إن وُجد، وإلا نزّل APK الكامل"
+          RELEASE_NOTES="$RELEASE_NOTES | Download .delta for small update, or full APK"
 
           # احذف Release cũ بنفس الـ tag لو موجود
           gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
