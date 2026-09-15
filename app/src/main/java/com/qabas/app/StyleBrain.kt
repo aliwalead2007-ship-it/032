@@ -122,7 +122,7 @@ data class StyleObject(
     val visualStyle: VisualStylePattern = VisualStylePattern(),
     val motionRhythm: MotionRhythmPattern = MotionRhythmPattern(),
     val contentTone: ContentTonePattern = ContentTonePattern(),
-    val overallScore: Int = 90,
+    val overallScore: Int = 0,
     val analysisSummary: String = "",
     val tags: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
@@ -191,7 +191,7 @@ data class StyleObject(
                 visualStyle = VisualStylePattern.fromMap(vMap),
                 motionRhythm = MotionRhythmPattern.fromMap(mMap),
                 contentTone = ContentTonePattern.fromMap(tMap),
-                overallScore = (map["overallScore"] as? Number)?.toInt() ?: 90,
+                overallScore = (map["overallScore"] as? Number)?.toInt()?.coerceIn(0, 100) ?: 0,
                 analysisSummary = map["analysisSummary"]?.toString() ?: "",
                 tags = tagsList,
                 createdAt = (map["createdAt"] as? Number)?.toLong() ?: System.currentTimeMillis(),
@@ -754,7 +754,7 @@ object StyleBrain {
                         visualTraits = vTraits,
                         motionTraits = mTraits,
                         textTraits = tTraits,
-                        overallScore = obj.optInt("overallScore", 90),
+                        overallScore = obj.optInt("overallScore", 0).coerceIn(0, 100),
                         absorbedAt = obj.optLong("absorbedAt", System.currentTimeMillis())
                     )
                 )
@@ -950,7 +950,7 @@ object StyleBrain {
                 listOf(proposal.newTextTrait) + targetStyle.textTraits
             } else targetStyle.textTraits
 
-            val newScore = (targetStyle.overallScore + proposal.enhancementScore).coerceAtMost(99)
+            val newScore = (targetStyle.overallScore + proposal.enhancementScore).coerceIn(0, 100)
             val updated = targetStyle.copy(
                 visualTraits = newVisual,
                 motionTraits = newMotion,
@@ -1022,9 +1022,9 @@ object StyleBrain {
             
             if (target != null) {
                 val newScore = if (success) {
-                    (target.overallScore + 2).coerceAtMost(99)
+                    (target.overallScore + 2).coerceIn(0, 100)
                 } else {
-                    (target.overallScore - 2).coerceAtLeast(70)
+                    (target.overallScore - 2).coerceIn(0, 100)
                 }
                 val updated = target.copy(overallScore = newScore)
                 val idx = currentStyles.indexOf(target)
@@ -1330,7 +1330,7 @@ object StyleBrain {
             it.sourceVideoPathOrUrl.isNotBlank() && it.sourceVideoPathOrUrl.equals(trimmedSource, ignoreCase = true) 
         }
         if (existingStyle != null) {
-            val boostedScore = (existingStyle.overallScore + 2).coerceAtMost(99)
+            val boostedScore = (existingStyle.overallScore + 2).coerceIn(0, 100)
             val enhancedStyle = existingStyle.copy(
                 overallScore = boostedScore,
                 name = if (styleName.isNotBlank()) styleName else existingStyle.name,
@@ -1397,7 +1397,7 @@ object StyleBrain {
                             "captionAnim=WordByWord",
                             "captionPos=bottom"
                         )
-                        score = (90 + (localStyle.avgSharpness * 20).toInt()).coerceIn(87, 98)
+                        score = (localStyle.avgSharpness.coerceIn(0f, 1f) * 100f).toInt()
                         val ofTag = if (localStyle.usedRealOpticalFlow) "Farneback" else "diff"
                         analysisText = "تحليل محلي متقدم: فلتر=${localStyle.filterHint} | لون أساسي=${localStyle.primaryHex} | لون خلفية=${localStyle.backgroundHex} | حركة=${localStyle.motionType} ($ofTag) | إطارات=${localStyle.framesUsed}"
                         Log.d("StyleBrain", "Local analysis successful: $analysisText")
@@ -1427,7 +1427,7 @@ object StyleBrain {
                             analysisText = aText
                         }
                         if (visionResult.has("overallScore")) {
-                            score = visionResult.optInt("overallScore", score).coerceIn(85, 99)
+                            score = visionResult.optInt("overallScore", score).coerceIn(0, 100)
                         }
 
                         val parsedPrimaryHex = visionResult.optString("primaryColorHex", localStyle?.primaryHex ?: "#E8C547")
@@ -1525,8 +1525,7 @@ object StyleBrain {
                     "tone": "وقور ومؤثر",
                     "visualTraits": ["ألوان داكنة DeepSlate #0B0F19", "لمسات ذهبية متوهجة Gold #E8C547", "تباين عالي Contrast 1:10", "إضاءة دافئة"],
                     "motionTraits": ["زووم بطيء متصاعد ناعم Slow Cinematic ZoomIn", "انتقالات تلاشي ناعمة Smooth Dissolve", "إيقاع وقور متوازن"],
-                    "textTraits": ["خط عربي كوفي عريض في المنطقة الآمنة", "إبراز الكلمات بالذهبي #E8C547", "ظهور كلمة بكلمة Word-by-Word"],
-                    "overallScore": 93
+                    "textTraits": ["خط عربي كوفي عريض في المنطقة الآمنة", "إبراز الكلمات بالذهبي #E8C547", "ظهور كلمة بكلمة Word-by-Word"]
                 }
             """.trimIndent()
             
@@ -1541,7 +1540,7 @@ object StyleBrain {
                     }
                     if (obj.has("overallScore")) {
                         val parsedScore = obj.getInt("overallScore")
-                        score = parsedScore.coerceIn(85, 99)
+                        score = parsedScore.coerceIn(0, 100)
                     }
                     
                     val parsedPrimary = obj.optString("primaryColorHex", "#E8C547")
@@ -1730,7 +1729,7 @@ object StyleBrain {
         val combinedTextTraits = (primary.textTraits.take(3) + 
                                    secondary.textTraits.take(2)).distinct()
 
-        val fusedScore = ((primary.overallScore * primaryWeight) + (secondary.overallScore * secondaryWeight)).toInt().coerceIn(80, 99)
+        val fusedScore = ((primary.overallScore * primaryWeight) + (secondary.overallScore * secondaryWeight)).toInt().coerceIn(0, 100)
         val defaultFusedName = customName?.ifBlank { null } ?: "دمج: ${primary.name.take(10)} + ${secondary.name.take(10)}"
 
         val analysisText = "نمط فني مصهور يجمع بنسبة (${(primaryWeight * 100).toInt()}%) من [${primary.name}] و (${(secondaryWeight * 100).toInt()}%) من [${secondary.name}]. مدمج من خصائص استخرجت مسبقاً."
@@ -1895,7 +1894,7 @@ object StyleBrain {
                             visualTraits = (pStyle.visualTraits.take(3) + sStyle.visualTraits.take(2)).distinct(),
                             motionTraits = (pStyle.motionTraits.take(3) + sStyle.motionTraits.take(2)).distinct(),
                             textTraits = (pStyle.textTraits.take(3) + sStyle.textTraits.take(2)).distinct(),
-                            overallScore = ((pStyle.overallScore * primaryWeight) + (sStyle.overallScore * secondaryWeight)).toInt().coerceIn(80, 99)
+                            overallScore = ((pStyle.overallScore * primaryWeight) + (sStyle.overallScore * secondaryWeight)).toInt().coerceIn(0, 100)
                         )
                     } else {
                         // تراجع عن الدمج إذا لم يجد أسلوبين صالحين، واختر الأول
@@ -1958,7 +1957,7 @@ object StyleBrain {
             matchedStyle.textTraits.filter { !it.startsWith("captionAnim=") && !it.startsWith("captionPos=") }.take(2).forEach { add(it) }
         }.distinct()
 
-        val blendedScore = ((core.strengthScore * 0.70) + (matchedStyle.overallScore * 0.30)).toInt().coerceIn(80, 100)
+        val blendedScore = ((core.strengthScore * 0.70) + (matchedStyle.overallScore * 0.30)).toInt().coerceIn(0, 100)
 
         return AbsorbedStyle(
             id = "blended_${matchedStyle.id}",
@@ -1996,8 +1995,8 @@ object StyleBrain {
         val texts = (core.textTraits + source.flatMap { it.textTraits }).distinct().take(4)
         val score = (
             (core.overallScore * 0.4) +
-            source.map { it.overallScore }.average().let { if (it.isNaN()) 80.0 else it } * 0.6
-        ).toInt().coerceIn(75, 100)
+            source.map { it.overallScore }.average().let { if (it.isNaN()) 0.0 else it } * 0.6
+        ).toInt().coerceIn(0, 100)
 
         val name = newName.ifBlank {
             if (source.size == 1) "دمج قبس × ${source.first().name}"
@@ -2060,9 +2059,9 @@ object StyleBrain {
 
             if (targetStyle != null) {
                 val newScore = if (isPositive) {
-                    (targetStyle.overallScore + 2).coerceAtMost(99)
+                    (targetStyle.overallScore + 2).coerceIn(0, 100)
                 } else {
-                    (targetStyle.overallScore - 3).coerceAtLeast(70)
+                    (targetStyle.overallScore - 3).coerceIn(0, 100)
                 }
                 val updatedTarget = targetStyle.copy(overallScore = newScore)
                 val index = currentStyles.indexOf(targetStyle)
@@ -2222,7 +2221,8 @@ object StyleBrain {
                 put("محاذاة في الثلث السفلي والوسط")
                 put("صندوق نصي داكن شبه شفاف مع تباين ذهبي")
             })
-            put("overallScore", 92)
+            put("overallScore", 0)
+            put("analysisSource", "FALLBACK")
         }
 
         if (frames.isEmpty()) {
@@ -2268,8 +2268,7 @@ object StyleBrain {
                   "tone": "وقور ومؤثر",
                   "visualTraits": ["سمة بصرية 1", "سمة بصرية 2", "سمة بصرية 3", "سمة بصرية 4"],
                   "motionTraits": ["سمة حركية 1", "سمة حركية 2", "سمة حركية 3"],
-                  "textTraits": ["سمة نصية 1", "سمة نصية 2", "سمة نصية 3"],
-                  "overallScore": 92
+                  "textTraits": ["سمة نصية 1", "سمة نصية 2", "سمة نصية 3"]
                 }
             """.trimIndent()
 
@@ -2332,9 +2331,10 @@ object StyleBrain {
 
                     // التحقق من الحقول الأساسية
                     if (parsedResult.has("analysis") && parsedResult.has("visualTraits")) {
-                        // التأكد من وجود overallScore ضمن النطاق
-                        val score = parsedResult.optInt("overallScore", 90).coerceIn(80, 99)
+                        // الدرجة المفقودة تعني عدم توفر قياس، ولا تتحول إلى درجة نجاح افتراضية
+                        val score = parsedResult.optInt("overallScore", 0).coerceIn(0, 100)
                         parsedResult.put("overallScore", score)
+                        parsedResult.put("analysisSource", "MODEL")
                         return@withContext parsedResult
                     }
                 }
@@ -2457,7 +2457,7 @@ object StyleBrain {
             textTraits = combinedTextTraits
         )
 
-        val fusedScore = ((primary.overallScore * primaryWeight) + (secondary.overallScore * secondaryWeight)).toInt().coerceIn(80, 99)
+        val fusedScore = ((primary.overallScore * primaryWeight) + (secondary.overallScore * secondaryWeight)).toInt().coerceIn(0, 100)
         val defaultFusedName = customName?.ifBlank { null } ?: "دمج هجين (${primary.name} × ${secondary.name})"
 
         return StyleObject(
@@ -2533,4 +2533,3 @@ object StyleBrain {
         }
     }
 }
-

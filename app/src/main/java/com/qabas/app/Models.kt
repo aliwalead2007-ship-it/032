@@ -11,11 +11,12 @@ data class IdeaAnalysis(
     val tone: String = "",
     val keywords: List<String> = emptyList(),
     val proposedScenes: List<String> = emptyList(),
-    val viralityScore: Int = 80,
+    val viralityScore: Int = 0,
     val hookSuggestions: List<String> = emptyList(),
     val ctaSuggestions: List<String> = emptyList(),
-    val confidence: Double = 1.0,
-    val themes: List<String> = emptyList()
+    val confidence: Double = 0.0,
+    val themes: List<String> = emptyList(),
+    val source: String = "MODEL"
 )
 
 @Immutable
@@ -36,8 +37,9 @@ data class VideoStyleAnalysis(
 data class TrendingIdea(
     val title: String,
     val description: String,
-    val viralityScore: Int = 80,
-    val tags: List<String> = emptyList()
+    val viralityScore: Int = 0,
+    val tags: List<String> = emptyList(),
+    val source: String = "MODEL"
 )
 
 @Immutable
@@ -49,4 +51,3 @@ data class Template(
     val transitions: String = "",
     val textAnimation: String = ""
 )
-

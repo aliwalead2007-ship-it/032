@@ -122,8 +122,7 @@ object RealGeminiService {
                     "themes": ["محور 1", "محور 2"],
                     "scenes": [
                         { "title": "عنوان المشهد", "description": "وصف المشهد المشتق من النص", "durationHintSeconds": 5 }
-                    ],
-                    "confidence": 0.95
+                    ]
                 }
             """.trimIndent()
 
@@ -159,7 +158,7 @@ object RealGeminiService {
                         val cleanJson = text.replace("```json", "").replace("```", "").trim()
                         val resultObj = JSONObject(cleanJson)
                         
-                        val confidence = resultObj.optDouble("confidence", 1.0)
+                        val confidence = resultObj.optDouble("confidence", 0.0).coerceIn(0.0, 1.0)
                         if (confidence < 0.3) {
                             SystemLogsManager.addLog("WARN", "مستوى الثقة ضعيف (\${(confidence * 100).toInt()}%)، سيتم استخدام التحليل المحلي.", androidx.compose.ui.graphics.Color(0xFFE8C547))
                             return@safeApiCallWithRetry fallbackResult
@@ -196,7 +195,8 @@ object RealGeminiService {
                             hookSuggestions = if (hook.isNotBlank()) listOf(hook) else emptyList(),
                             ctaSuggestions = emptyList(),
                             confidence = confidence,
-                            themes = themesList
+                            themes = themesList,
+                            source = "MODEL"
                         )
                     }
             }
@@ -472,9 +472,10 @@ object RealGeminiService {
             tone = "خاشع وملهم",
             keywords = cleanIdea.split(" ").take(4).filter { it.length > 3 },
             proposedScenes = generatedScenes,
-            viralityScore = 80,
+            viralityScore = 0,
             hookSuggestions = listOf("تعذّر التحليل — أكمل بالفكرة كما هي"),
-            ctaSuggestions = listOf("شارك المقطع لتعم الفائدة", "اترك تعليقاً برأيك")
+            ctaSuggestions = listOf("شارك المقطع لتعم الفائدة", "اترك تعليقاً برأيك"),
+            source = "FALLBACK"
         )
     }
 
@@ -1592,10 +1593,10 @@ object AppServices {
         val apiKey = KeyVault.gemini
 
         val defaultIdeas = listOf(
-            TrendingIdea(title = "قصص الأنبياء - العبرة الخالدة", description = "فيديوهات قصيرة سينمائية تسرد مواقف الصبر واليقين", viralityScore = 96, tags = listOf("قصص", "إيمان", "عبرة")),
-            TrendingIdea(title = "تدبر آية - سكينة القلب", description = "وقفات قرآنية وجدانية مع تصوير طبيعي وألوان ذهبية", viralityScore = 93, tags = listOf("قرآن", "تدبر", "سكينة")),
-            TrendingIdea(title = "أسرار الفجر والبركة", description = "خطاف قوي عن ثمرات الاستيقاظ المبكر وصلاة الفجر", viralityScore = 91, tags = listOf("الفجر", "بركة", "عادات")),
-            TrendingIdea(title = "أدعية نبوية مأثورة", description = "سلسلة أدعية من السنة الصحيحة بأداء صوتي هادئ وخاشع", viralityScore = 89, tags = listOf("دعاء", "سنة", "ذكر"))
+            TrendingIdea(title = "قصص الأنبياء - العبرة الخالدة", description = "فيديوهات قصيرة سينمائية تسرد مواقف الصبر واليقين", tags = listOf("قصص", "إيمان", "عبرة"), source = "FALLBACK"),
+            TrendingIdea(title = "تدبر آية - سكينة القلب", description = "وقفات قرآنية وجدانية مع تصوير طبيعي وألوان ذهبية", tags = listOf("قرآن", "تدبر", "سكينة"), source = "FALLBACK"),
+            TrendingIdea(title = "أسرار الفجر والبركة", description = "خطاف قوي عن ثمرات الاستيقاظ المبكر وصلاة الفجر", tags = listOf("الفجر", "بركة", "عادات"), source = "FALLBACK"),
+            TrendingIdea(title = "أدعية نبوية مأثورة", description = "سلسلة أدعية من السنة الصحيحة بأداء صوتي هادئ وخاشع", tags = listOf("دعاء", "سنة", "ذكر"), source = "FALLBACK")
         )
 
         if (apiKey.isBlank() || apiKey == "YOUR_GEMINI_API_KEY") {
@@ -1615,7 +1616,6 @@ object AppServices {
                     {
                         "title": "عنوان الفكرة الجذاب",
                         "description": "وصف المشهد والإخراج في سطرين",
-                        "viralityScore": 95,
                         "tags": ["وسم1", "وسم2"]
                     }
                 ]
@@ -1636,8 +1636,9 @@ object AppServices {
                     TrendingIdea(
                         title = obj.optString("title", "فكرة إسلامية ملهمة"),
                         description = obj.optString("description", "محتوى دعوي احترافي"),
-                        viralityScore = obj.optInt("viralityScore", 90),
-                        tags = tagsList.takeIf { it.isNotEmpty() } ?: listOf("إسلامي", "قبس")
+                        viralityScore = obj.optInt("viralityScore", 0).coerceIn(0, 100),
+                        tags = tagsList.takeIf { it.isNotEmpty() } ?: listOf("إسلامي", "قبس"),
+                        source = "MODEL"
                     )
                 )
             }

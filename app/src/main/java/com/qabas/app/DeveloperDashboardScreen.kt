@@ -1318,7 +1318,7 @@ fun LiveCloudGuardLogsCard(context: Context) {
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        "لم يتم تسجيل أي عمليات فحص مخالفة مؤخراً. النظام آمن تماماً ✨",
+                        "لا توجد سجلات تدقيق متاحة حتى الآن.",
                         color = Color.Gray,
                         fontFamily = NotoSansFont,
                         fontSize = 12.sp,

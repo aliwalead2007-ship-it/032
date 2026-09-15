@@ -1961,7 +1961,14 @@ fun InputScreen(
                                             shape = RoundedCornerShape(14.dp)
                                         ) {
                                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                Text(idea.title, color = GoldPrimary, fontFamily = NotoSansFont, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                                                Text(
+                                                    if (idea.source == "FALLBACK") "${idea.title} (اقتراح افتراضي)" else idea.title,
+                                                    color = GoldPrimary,
+                                                    fontFamily = NotoSansFont,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp,
+                                                    maxLines = 1
+                                                )
                                                 Text(idea.description, color = TextSecondary, fontFamily = NotoSansFont, fontSize = 12.sp, maxLines = 2, lineHeight = 16.sp)
                                             }
                                         }
@@ -2339,4 +2346,3 @@ private fun SourceTypeCard(
         }
     }
 }
-

@@ -147,7 +147,7 @@ class AccountService(private val context: Context) {
     var isDevExclusiveStudioEnabled: Boolean
         get() {
             val qabasPrefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
-            return qabasPrefs.getBoolean("dev_exclusive_studio_enabled", true)
+            return qabasPrefs.getBoolean("dev_exclusive_studio_enabled", false)
         }
         set(value) {
             val qabasPrefs = context.getSharedPreferences("qabas_prefs", Context.MODE_PRIVATE)
@@ -194,5 +194,4 @@ class AccountService(private val context: Context) {
         }
     }
 }
-
 

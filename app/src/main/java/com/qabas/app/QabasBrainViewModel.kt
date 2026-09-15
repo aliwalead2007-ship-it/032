@@ -50,7 +50,7 @@ data class BrainDecision(
     val ffmpegFilterSnippet: String = "",
     val audioSfxSuggestions: List<String> = emptyList(),
     val selectedStyleName: String = "",
-    val compatibilityScore: Int = 94,
+    val compatibilityScore: Int = 0,
     val aiRationale: String = "",
     val targetAudience: String = "الجمهور العام",
     val callToAction: String = "شارك المقطع لتنال الأجر المبارك"
@@ -66,7 +66,7 @@ data class BrainUiState(
     val activeStyleObjectsCount: Int = 0,
     val activeReferenceStyles: List<StyleObject> = emptyList(),
     val currentDecision: BrainDecision? = null,
-    val brainStrengthScore: Int = 95,
+    val brainStrengthScore: Int = 0,
     val lastProcessedIdea: String = "",
     val errorMessage: String? = null
 )
@@ -632,7 +632,7 @@ class QabasBrainViewModel(
                     ffmpegFilterSnippet = parsed.optString("ffmpegFilterSnippet", "eq=contrast=1.15:brightness=0.02:saturation=1.1"),
                     audioSfxSuggestions = if (sfxList.isNotEmpty()) sfxList else listOf("دوي عميق", "حفيف هادئ", "مؤثر تصاعدي"),
                     selectedStyleName = parsed.optString("selectedStyleName", chosenStyle?.name ?: "النمط الوثائقي الإيماني"),
-                    compatibilityScore = parsed.optInt("compatibilityScore", 95).coerceIn(85, 99),
+                    compatibilityScore = parsed.optInt("compatibilityScore", 0).coerceIn(0, 100),
                     aiRationale = parsed.optString("aiRationale", "تم توجيه الإخراج ليتوافق مع معايير الهيبة والوقار وشد الانتباه الهادف"),
                     targetAudience = parsed.optString("targetAudience", targetAudience),
                     callToAction = parsed.optString("callToAction", "شارك لتنال الأجر المبارك")
@@ -664,7 +664,7 @@ class QabasBrainViewModel(
             ffmpegFilterSnippet = "eq=contrast=1.12:brightness=0.02:saturation=1.08,scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
             audioSfxSuggestions = listOf("نبرة صوت عميقة ومطمئنة", "مؤثر طبيعي هادئ", "دوي سينمائي خافت عند النهاية"),
             selectedStyleName = styleName,
-            compatibilityScore = chosenStyle?.overallScore ?: 94,
+            compatibilityScore = chosenStyle?.overallScore ?: 0,
             aiRationale = "تم اختيار هذا الأسلوب الإخراجي بناءً على السمات المحفوظة في ذاكرة العقل التراكمية لتوفير أقصى درجات التأثير الإيماني والوقار.",
             targetAudience = audience,
             callToAction = "شارك المقطع ليكون نافذة خير وأجر جاري"

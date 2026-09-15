@@ -137,9 +137,9 @@ class QabasBrainRepository(private val context: Context) {
             val target = allStyles.find { it.id == styleNameOrId || it.name.equals(styleNameOrId, ignoreCase = true) }
             if (target != null) {
                 val updatedScore = if (isPositive) {
-                    (target.overallScore + 2).coerceAtMost(99)
+                    (target.overallScore + 2).coerceIn(0, 100)
                 } else {
-                    (target.overallScore - 3).coerceAtLeast(70)
+                    (target.overallScore - 3).coerceIn(0, 100)
                 }
                 val updatedStyle = target.copy(overallScore = updatedScore)
                 saveStyleObject(updatedStyle)
