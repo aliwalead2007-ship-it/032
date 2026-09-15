@@ -1,11 +1,27 @@
-# قبس — CI مع إصلاح gradle-wrapper.jar تلقائياً
+# قبس — CI: يبني فقط عند تغيير كود Kotlin/Gradle
 name: Build & Sign APK
 
 on:
   push:
     branches: [main, master]
+    paths:
+      - 'app/src/**'          # أي ملف Kotlin
+      - 'app/build.gradle.kts'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
+      - 'gradlew'
+      - 'gradlew.bat'
+      - '.github/workflows/android-ci.yml'
+      - '.env.example'
   pull_request:
     branches: [main, master]
+    paths:
+      - 'app/src/**'
+      - 'app/build.gradle.kts'
+      - 'build.gradle.kts'
+      - 'settings.gradle.kts'
+      - 'gradle/**'
   workflow_dispatch:
 
 concurrency:
@@ -32,19 +48,14 @@ jobs:
       - name: Setup Android SDK
         run: |
           echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
-          echo "Using preinstalled SDK at $ANDROID_HOME"
-          # Accept SDK licenses non-interactively
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
-          # Install required SDK components if missing
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "build-tools;36.0.0" "platforms;android-36" 2>/dev/null || true
 
-      # إصلاح jar التالف (غالباً من رفع الهاتف) — يحمّل الرسمي قبل أي بناء
       - name: Fix gradle-wrapper.jar
         run: |
           mkdir -p gradle/wrapper
           curl -sL -o gradle/wrapper/gradle-wrapper.jar \
             "https://raw.githubusercontent.com/gradle/gradle/v9.0.0/gradle/wrapper/gradle-wrapper.jar"
-          # تحقق أنه ZIP/JAR صالح
           python3 -c "import zipfile; zipfile.ZipFile('gradle/wrapper/gradle-wrapper.jar').namelist(); print('wrapper jar OK')"
           chmod +x gradlew
 
@@ -60,12 +71,7 @@ jobs:
           if [ -n "$GOOGLE_SERVICES_JSON" ]; then
             mkdir -p app
             echo "$GOOGLE_SERVICES_JSON" > app/google-services.json
-            echo "google-services.json written"
-          else
-            echo "No GOOGLE_SERVICES_JSON secret — skipping"
           fi
-          # .env يُبنى من أسرار GitHub إن وُجدت، وإلا يعود لقيم placeholder
-          # من .env.example (SupabaseConfig.isConfigured يرفضها → وضع محلي آمن).
           {
             echo "SUPABASE_URL=\"${SUPABASE_URL:-https://YOUR_PROJECT_REF.supabase.co}\""
             echo "SUPABASE_ANON_KEY=\"${SUPABASE_ANON_KEY:-your_publishable_or_anon_key}\""
@@ -80,25 +86,14 @@ jobs:
             echo "QF_CLIENT_ID=\"${QF_CLIENT_ID:-your_key}\""
             echo "QF_CLIENT_SECRET=\"${QF_CLIENT_SECRET:-your_key}\""
           } > .env
-          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
-            echo ".env written — Supabase ENABLED in built APK"
-          else
-            echo ".env written — Supabase placeholders (APK runs in local mode)"
-          fi
-
-      - name: Compile Kotlin (fast fail)
-        run: |
-          ./gradlew :app:compileDebugKotlin \
-            --stacktrace \
-            --no-daemon \
-            --max-workers=2
 
       - name: Assemble Debug APK
         run: |
           ./gradlew assembleDebug \
             --stacktrace \
             --no-daemon \
-            --max-workers=2
+            --max-workers=2 \
+            --build-cache
 
       - name: Upload APK
         if: success()
@@ -112,6 +107,4 @@ jobs:
       - name: On failure — print Kotlin errors hint
         if: failure()
         run: |
-          echo "================================================"
           echo "ابحث في اللوج عن: e: file://  أو Unresolved reference"
-          echo "================================================"
