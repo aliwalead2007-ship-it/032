@@ -30,7 +30,13 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}" >> "$GITHUB_ENV"
+          echo "Using preinstalled SDK at $ANDROID_HOME"
+          # Accept SDK licenses non-interactively
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          # Install required SDK components if missing
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "build-tools;36.0.0" "platforms;android-36" 2>/dev/null || true
 
       # إصلاح jar التالف (غالباً من رفع الهاتف) — يحمّل الرسمي قبل أي بناء
       - name: Fix gradle-wrapper.jar
