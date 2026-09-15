@@ -172,10 +172,11 @@ object UpdateManager {
                             // احصل على مسار APK الحالي
                             val currentApk = getCurrentApkPath(context)
                             if (currentApk != null) {
+                                val currentApkFile = File(currentApk)
                                 val newApk = File(updatesDir, "qabas-${update.versionName}.apk")
 
                                 // طبّق ملف الفرق
-                                val applied = applyDeltaPatch(currentApk, patchFile, newApk)
+                                val applied = applyDeltaPatch(currentApkFile, patchFile, newApk)
 
                                 if (applied && newApk.exists() && newApk.length() > 1_000_000) {
                                     onProgress(100)
