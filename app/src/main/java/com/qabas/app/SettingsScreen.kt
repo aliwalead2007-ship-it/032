@@ -63,6 +63,9 @@ fun SettingsScreen(
     var showAboutAppDialog by remember { mutableStateOf(false) }
     var showChangelogDialog by remember { mutableStateOf(false) }
     var showPrivacyDialog by remember { mutableStateOf(false) }
+    var updateState by remember { mutableStateOf<String?>(null) } // null = idle, "checking...", "found", "none", "error"
+    var updateInfo by remember { mutableStateOf<UpdateManager.UpdateInfo?>(null) }
+    var updateProgress by remember { mutableStateOf(0) }
 
     if (linkDialogState != null && selectedPlatform != null) {
         AlertDialog(
@@ -615,6 +618,118 @@ fun SettingsScreen(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
+                    }
+                }
+
+                // ── زر فحص التحديثات ──
+                HorizontalDivider(color = Color(0xFF222222), modifier = Modifier.padding(vertical = 10.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth().clickable(enabled = updateState != "checking...") {
+                        updateState = "checking..."
+                        updateProgress = 0
+                        coroutineScope.launch {
+                            try {
+                                val info = UpdateManager.checkForUpdate(context)
+                                if (info != null) {
+                                    updateInfo = info
+                                    updateState = "found"
+                                } else {
+                                    updateState = "none"
+                                }
+                            } catch (e: Exception) {
+                                updateState = "error"
+                            }
+                        }
+                    },
+                    color = when (updateState) {
+                        "found" -> Color(0xFF10B981).copy(alpha = 0.1f)
+                        "checking..." -> AiViolet.copy(alpha = 0.1f)
+                        else -> Color(0xFF1A1F2E)
+                    },
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, when (updateState) {
+                        "found" -> Color(0xFF10B981).copy(alpha = 0.5f)
+                        "checking..." -> AiViolet.copy(alpha = 0.5f)
+                        else -> Color(0xFF334155)
+                    })
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = when (updateState) {
+                                    "found" -> Icons.Default.SystemUpdate
+                                    "checking..." -> Icons.Default.Sync
+                                    "none" -> Icons.Default.CheckCircle
+                                    "error" -> Icons.Default.ErrorOutline
+                                    else -> Icons.Default.SystemUpdate
+                                },
+                                contentDescription = null,
+                                tint = when (updateState) {
+                                    "found" -> Color(0xFF10B981)
+                                    "checking..." -> AiViolet
+                                    "none" -> Color(0xFF10B981)
+                                    "error" -> Color(0xFFF97316)
+                                    else -> GoldPrimary
+                                },
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = when (updateState) {
+                                        "checking..." -> "جاري الفحص..."
+                                        "found" -> "تحديث متاح: v${updateInfo?.versionName}"
+                                        "none" -> "أنت تستخدم أحدث إصدار ✓"
+                                        "error" -> "تعذر الفحص — اضغط للمحاولة"
+                                        else -> "فحص التديثات"
+                                    },
+                                    color = Color.White,
+                                    fontFamily = CairoFont,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (updateState == "found" && updateInfo != null) {
+                                    val u = updateInfo!!
+                                    val sizeText = if (u.deltaUrl != null) "فقط ${UpdateManager.formatSize(u.deltaSize)} (ملف صغير)" else UpdateManager.formatSize(u.apkSize)
+                                    Text("الحجم: $sizeText", color = GoldPrimary, fontFamily = NotoSansFont, fontSize = 10.sp)
+                                }
+                            }
+                        }
+                        if (updateState == "found") {
+                            Button(
+                                onClick = {
+                                    updateInfo?.let { info ->
+                                        updateState = "downloading"
+                                        updateProgress = 0
+                                        UpdateManager.downloadAndInstall(context, info,
+                                            onProgress = { updateProgress = it },
+                                            onDone = { ok, msg -> updateState = if (ok) "done" else "error" }
+                                        )
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981)),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                            ) {
+                                Text("تحديث", color = Color.White, fontFamily = CairoFont, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (updateState == "downloading") {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                LinearProgressIndicator(
+                                    progress = { updateProgress / 100f },
+                                    modifier = Modifier.width(60.dp).height(4.dp),
+                                    color = AiViolet,
+                                    trackColor = Color(0xFF1A1F2E)
+                                )
+                                Text("${updateProgress}%", color = AiViolet, fontFamily = NotoSansFont, fontSize = 9.sp)
+                            }
+                        }
                     }
                 }
 

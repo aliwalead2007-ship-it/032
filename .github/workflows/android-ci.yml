@@ -1,11 +1,11 @@
-# قبس — CI: يبني فقط عند تغيير كود Kotlin/Gradle
+# قبس — CI: يبني عند تغيير الكود + يُنشئ ملف Delta صغير
 name: Build & Sign APK
 
 on:
   push:
     branches: [main, master]
     paths:
-      - 'app/src/**'          # أي ملف Kotlin
+      - 'app/src/**'
       - 'app/build.gradle.kts'
       - 'build.gradle.kts'
       - 'settings.gradle.kts'
@@ -33,10 +33,14 @@ jobs:
     name: Build Debug APK
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -95,7 +99,7 @@ jobs:
             --max-workers=2 \
             --build-cache
 
-      - name: Upload APK
+      - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
@@ -103,6 +107,95 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
           retention-days: 7
+
+      # ── Delta Patch: ملف صغير بدل APK كامل ──
+      - name: Generate delta patch & publish release
+        if: success() && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          NEW_APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          VERSION=$(grep 'versionName' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts | sed 's/.*= \([0-9]*\).*/\1/')
+          APK_SIZE=$(du -h "$NEW_APK" | cut -f1)
+          TAG="v${VERSION}"
+
+          echo "APK: $NEW_APK ($APK_SIZE) | Version: $VERSION ($VERSION_CODE) | Tag: $TAG"
+
+          # ── حمّل آخر APK من GitHub Releases ──
+          PREV_APK="/tmp/prev.apk"
+          PATCH_FILE="/tmp/qabas-${VERSION}.delta"
+
+          LAST_RELEASE=$(gh release list --limit 1 --json tagName --jq '.[0].tagName' 2>/dev/null || echo "")
+          echo "Last release: ${LAST_RELEASE:-none}"
+
+          if [ -n "$LAST_RELEASE" ] && [ "$LAST_RELEASE" != "null" ]; then
+            echo "Downloading previous APK from $LAST_RELEASE..."
+            gh release download "$LAST_RELEASE" \
+              --pattern "*.apk" \
+              --cwd /tmp \
+              --skip-existing 2>/dev/null || true
+
+            PREV_APK=$(ls /tmp/*.apk 2>/dev/null | head -1 || echo "")
+
+            if [ -n "$PREV_APK" ] && [ -f "$PREV_APK" ]; then
+              echo "Previous APK found: $PREV_APK"
+
+              # ثبّت xdelta3
+              sudo apt-get update -qq && sudo apt-get install -y -qq xdelta3 2>/dev/null
+
+              # أنشئ ملف الفرق
+              xdelta3 -e -s "$PREV_APK" "$NEW_APK" "$PATCH_FILE" || true
+
+              if [ -f "$PATCH_FILE" ] && [ -s "$PATCH_FILE" ]; then
+                PATCH_SIZE=$(du -h "$PATCH_FILE" | cut -f1)
+                echo "Delta patch created: $PATCH_SIZE (vs full APK: $APK_SIZE)"
+                IS_DELTA="true"
+              else
+                echo "Delta creation failed — uploading full APK only"
+                IS_DELTA="false"
+              fi
+
+              rm -f "$PREV_APK"
+            else
+              echo "No previous APK found — uploading full APK"
+              IS_DELTA="false"
+            fi
+          else
+            echo "No previous releases — uploading full APK"
+            IS_DELTA="false"
+          fi
+
+          # ── ارفع كـ GitHub Release ──
+          RELEASE_NOTES="📦 Qabas $VERSION ($VERSION_CODE)
+_APK: $APK_SIZE_"
+
+          if [ "$IS_DELTA" = "true" ]; then
+            PATCH_SIZE=$(du -h "$PATCH_FILE" | cut -f1)
+            RELEASE_NOTES="${RELEASE_NOTES}
+🔄 Delta patch: $PATCH_SIZE (تحديث فرق فقط)"
+          fi
+
+          RELEASE_NOTES="${RELEASE_NOTES}
+🔗 للتحديث: نزّل ملف .delta إن وُجد، وإلا نزّل APK الكامل"
+
+          # احذف Release cũ بنفس الـ tag لو موجود
+          gh release delete "$TAG" --yes --cleanup-tag 2>/dev/null || true
+
+          # أنشئ Release جديد
+          gh release create "$TAG" \
+            --title "Qabas $VERSION" \
+            --notes "$RELEASE_NOTES" \
+            "$NEW_APK"
+
+          # أضف ملف Delta إن وُجد
+          if [ "$IS_DELTA" = "true" ] && [ -f "$PATCH_FILE" ]; then
+            gh release upload "$TAG" "$PATCH_FILE" --clobber
+            echo "✅ Delta patch uploaded alongside full APK"
+          fi
+
+          echo "✅ Release published: $TAG"
 
       - name: On failure — print Kotlin errors hint
         if: failure()
