@@ -424,7 +424,7 @@ object RealGeminiService {
             if (response.isSuccessful) {
                 val responseBody = response.body?.string() ?: ""
                 val responseJson = JSONObject(responseBody)
-                val textResponse = extractGeminiText(responseJson) ?: return@safeApiCallWithRetry fallbackScenes
+                val textResponse = extractGeminiText(responseJson) ?: return@safeApiCall fallbackScenes
 
                 // Extract JSON array from text response if it's wrapped in markdown
                 val cleanJson = if (textResponse.contains("[")) textResponse.substring(textResponse.indexOf("["), textResponse.lastIndexOf("]") + 1) else textResponse
